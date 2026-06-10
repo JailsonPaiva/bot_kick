@@ -1,0 +1,106 @@
+# Kick Bot — OAuth 2.1 + Echo Test (MVP)
+
+Bot para a plataforma [Kick.com](https://kick.com) que valida autenticação OAuth e leitura/escrita no chat via comandos de echo.
+
+## Pré-requisitos
+
+- **Node.js 20+**
+- Conta Kick com acesso ao [Developer Portal](https://kick.com/settings/developer)
+- npm
+
+## Configuração do app na Kick
+
+1. Acesse [kick.com/settings/developer](https://kick.com/settings/developer)
+2. Crie um novo aplicativo
+3. Configure a **Redirect URL** como:
+   ```
+   http://localhost:3000/callback
+   ```
+4. Anote o **Client ID** e **Client Secret**
+5. Garanta que os scopes `user:read`, `channel:read` e `chat:write` estão habilitados
+
+## Instalação e execução
+
+```bash
+# Copie e preencha as variáveis de ambiente
+cp .env.example .env
+
+# Instale dependências e inicie o bot
+npm install
+npm run dev
+```
+
+Na primeira execução, o bot abrirá o browser para autorização OAuth. Após aprovar, os tokens são salvos em `.tokens.json` e reutilizados nas próximas execuções.
+
+### Variáveis de ambiente (`.env`)
+
+| Variável | Descrição |
+|---|---|
+| `KICK_CLIENT_ID` | Client ID do app Kick |
+| `KICK_CLIENT_SECRET` | Client Secret do app Kick |
+| `KICK_CHANNEL_SLUG` | Slug do canal — parte da URL após `kick.com/` (ex: `unao-da-firma`) |
+| `KICK_BOT_SLUG` | Slug da conta do bot (para ignorar mensagens próprias) |
+| `KICK_CHATROOM_ID` | ID numérico do chatroom (veja seção abaixo se receber HTTP 403) |
+
+### Como descobrir o `KICK_CHANNEL_SLUG`
+
+O slug **não é necessariamente** o nome de exibição da sua conta. É o identificador na URL do canal:
+
+1. Abra seu canal no browser (ex: `https://kick.com/unao-da-firma`)
+2. Copie só a parte depois de `kick.com/` → `unao-da-firma`
+3. Use **hífens** (`-`), não underscores (`_`)
+
+### Como obter o `KICK_CHATROOM_ID` (se der erro 403)
+
+A Kick protege `kick.com/api/v2/channels/...` com Cloudflare. Requisições do Node.js costumam receber **403**, mesmo com slug correto. Solução:
+
+1. No **browser**, acesse: `https://kick.com/api/v2/channels/<seu-slug>`
+2. No JSON, encontre: `"chatroom": { "id": 123456 }`
+3. Adicione no `.env`: `KICK_CHATROOM_ID=123456`
+4. Rode `npm run dev` novamente
+
+## Comandos no chat
+
+| Comando | Resposta |
+|---|---|
+| `!echo <texto>` | Repete o texto informado |
+| `!ping` | `@<username> pong! 🏓` |
+| `!auth` | `@<username> autenticado como <bot_slug> ✅` |
+
+## Fluxo OAuth (resumo)
+
+OAuth é o protocolo que permite ao bot agir em nome da sua conta Kick sem expor sua senha.
+
+1. O bot gera um par PKCE (`code_verifier` + `code_challenge`) e abre o browser
+2. Você autoriza o app na página da Kick
+3. A Kick redireciona para `localhost:3000/callback` com um `code` temporário
+4. O bot troca esse `code` por `access_token` + `refresh_token`
+5. Tokens são salvos em `.tokens.json` e renovados automaticamente antes de expirar
+
+PKCE garante que apenas quem iniciou o fluxo pode completá-lo — proteção extra contra interceptação do `code`.
+
+## Arquitetura
+
+```
+src/
+├── auth/       OAuth 2.1 PKCE, refresh de tokens, persistência local
+├── chat/       WebSocket Pusher (leitura) + API REST (escrita)
+├── utils/      Logger
+└── bot.ts      Entrypoint e handlers de comando
+```
+
+## Scripts npm
+
+| Script | Descrição |
+|---|---|
+| `npm run dev` | Executa o bot com tsx (desenvolvimento) |
+| `npm run build` | Compila TypeScript para `dist/` |
+| `npm start` | Executa a versão compilada |
+
+## Próximos passos (Fase 2)
+
+- **Jogo da velha (`!ttt`)** — estado de partida em memória/SQLite, grid 3×3, turnos alternados entre streamer e viewer
+- **Ranking e pontos** — persistência SQLite, tabela de jogadores, vitórias/derrotas/empates
+- **Comandos de jogo** — `!ttt join`, `!ttt <posição>`, `!rank`, timeout de partidas inativas
+- **Moderação básica** — cooldown por usuário, limite de partidas simultâneas
+- **Refatoração de estado** — módulo `games/` com interface genérica de mini game para futuros jogos
