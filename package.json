@@ -2,10 +2,11 @@
   "name": "kick-bot",
   "version": "1.0.0",
   "description": "Bot Kick.com — OAuth 2.1 + Echo Test (MVP)",
+  "type": "module",
   "main": "dist/bot.js",
   "scripts": {
     "dev": "tsx src/bot.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-migrations.mjs",
     "start": "node dist/bot.js"
   },
   "engines": {
@@ -15,12 +16,14 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^1.7.9",
+    "better-sqlite3": "^11.8.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "open": "^10.1.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "@types/ws": "^8.5.13",

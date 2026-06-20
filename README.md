@@ -85,8 +85,11 @@ PKCE garante que apenas quem iniciou o fluxo pode completá-lo — proteção ex
 src/
 ├── auth/       OAuth 2.1 PKCE, refresh de tokens, persistência local
 ├── chat/       WebSocket Pusher (leitura) + API REST (escrita)
-├── utils/      Logger
-└── bot.ts      Entrypoint e handlers de comando
+├── commands/   Parser, router e handlers de comando
+├── config/     Configuração de jogos (timeouts, cooldowns)
+├── db/         SQLite, migrations e repositories
+├── utils/      Logger, helpers de env
+└── bot.ts      Entrypoint (wiring)
 ```
 
 ## Scripts npm
@@ -99,8 +102,12 @@ src/
 
 ## Próximos passos (Fase 2)
 
-- **Jogo da velha (`!ttt`)** — estado de partida em memória/SQLite, grid 3×3, turnos alternados entre streamer e viewer
+Planejamento detalhado em **[docs/FASE-2-PLANEJAMENTO.md](docs/FASE-2-PLANEJAMENTO.md)**.
+
+Resumo:
+
+- **Jogo da velha (`!ttt`)** — estado de partida em SQLite, grid 3×3, turnos alternados
 - **Ranking e pontos** — persistência SQLite, tabela de jogadores, vitórias/derrotas/empates
 - **Comandos de jogo** — `!ttt join`, `!ttt <posição>`, `!rank`, timeout de partidas inativas
 - **Moderação básica** — cooldown por usuário, limite de partidas simultâneas
-- **Refatoração de estado** — módulo `games/` com interface genérica de mini game para futuros jogos
+- **Refatoração de estado** — módulo `games/` com interface genérica de mini game

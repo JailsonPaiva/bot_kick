@@ -1,76 +1,24 @@
 /**
- * Entrypoint do bot Kick — conecta OAuth, WebSocket e handlers de echo.
- * Comandos: !echo, !ping, !auth
+ * Entrypoint do bot Kick — conecta OAuth, WebSocket, banco e roteador de comandos.
  */
 
 import "dotenv/config";
 import { ensureAuthenticated } from "./auth/authManager.js";
 import { getAuthenticatedBroadcasterId } from "./auth/userInfo.js";
 import { WsListener, resolveChatroomId } from "./chat/wsListener.js";
-import { sendMessage } from "./chat/chatSender.js";
 import type { ChatMessage } from "./chat/types.js";
+import { createCommandRouter } from "./commands/index.js";
+import { initDatabase, closeDatabase } from "./db/index.js";
+import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Variável de ambiente ${name} não definida no .env`);
-  }
-  return value;
-}
-
-function logIncomingMessage(msg: ChatMessage): void {
-  logger.info(
-    `[CHAT] ${msg.sender.username}: ${msg.content}`
-  );
-}
-
-async function handleMessage(
-  msg: ChatMessage,
-  broadcasterId: number,
-  botSlug: string
-): Promise<void> {
-  if (msg.sender.slug.toLowerCase() === botSlug.toLowerCase()) {
-    return;
-  }
-
-  logIncomingMessage(msg);
-
-  const content = msg.content.trim();
-  const username = msg.sender.username;
-
-  try {
-    if (content.startsWith("!echo ")) {
-      const echoText = content.slice("!echo ".length).trim();
-      if (echoText) {
-        await sendMessage(broadcasterId, echoText);
-        logger.info(`[ECHO] Respondido: ${echoText}`);
-      }
-      return;
-    }
-
-    if (content === "!ping") {
-      const reply = `@${username} pong! 🏓`;
-      await sendMessage(broadcasterId, reply);
-      logger.info(`[PING] Respondido para ${username}`);
-      return;
-    }
-
-    if (content === "!auth") {
-      const reply = `@${username} autenticado como ${botSlug} ✅`;
-      await sendMessage(broadcasterId, reply);
-      logger.info(`[AUTH] Respondido para ${username}`);
-    }
-  } catch (err) {
-    logger.error(`Erro ao processar comando "${content}"`, err);
-  }
-}
 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot — OAuth + Echo MVP ===");
 
   const channelSlug = requireEnv("KICK_CHANNEL_SLUG");
   const botSlug = requireEnv("KICK_BOT_SLUG");
+
+  initDatabase();
 
   await ensureAuthenticated();
   logger.info("Autenticação OK");
@@ -80,15 +28,23 @@ async function main(): Promise<void> {
     getAuthenticatedBroadcasterId(),
   ]);
 
+  const router = createCommandRouter();
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
-    void handleMessage(msg, broadcasterId, botSlug);
+    void router.dispatch(msg, {
+      message: msg,
+      broadcasterId,
+      botSlug,
+      channelSlug,
+      chatroomId,
+    });
   });
 
   listener.on("connected", () => {
+    const commands = router.getRegisteredCommands().map((c) => `!${c}`).join(" | ");
     logger.info("Bot online — aguardando mensagens no chat...");
-    logger.info("Comandos: !echo <texto> | !ping | !auth");
+    logger.info(`Comandos: ${commands}`);
   });
 
   listener.on("error", (err: Error) => {
@@ -100,6 +56,7 @@ async function main(): Promise<void> {
   const shutdown = (): void => {
     logger.info("Encerrando bot...");
     listener.disconnect();
+    closeDatabase();
     process.exit(0);
   };
 
@@ -117,5 +74,6 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   logger.error("Falha fatal ao iniciar o bot", err);
+  closeDatabase();
   process.exit(1);
 });
