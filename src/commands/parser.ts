@@ -37,6 +37,9 @@ export function parseCommand(content: string): ParsedCommand | null {
     "help",
     "challenge",
     "me",
+    "start",
+    "end",
+    "status",
   ]);
 
   if (knownSubcommands.has(firstPart)) {

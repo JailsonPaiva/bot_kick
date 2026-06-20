@@ -152,19 +152,23 @@ interface MiniGame {
 }
 ```
 
+- [x] Interface `MiniGame` e `GameHandlerContext` em `src/games/types.ts`
+
 #### Etapa 2.2.2 — `GameManager` (estado em memória + persistência)
 
-- [ ] Mapa `channelSlug → ActiveGame` para partidas em andamento
-- [ ] Ao iniciar/finalizar partida → persiste no SQLite
-- [ ] Timer de inatividade — cancela partida e anuncia no chat
-- [ ] Impede múltiplas partidas simultâneas no mesmo canal
+- [x] Mapa `channelSlug → ActiveGame` para partidas em andamento
+- [x] Ao iniciar/finalizar partida → persiste no SQLite
+- [x] Timer de inatividade — cancela partida e anuncia no chat
+- [x] Impede múltiplas partidas simultâneas no mesmo canal
 
 #### Etapa 2.2.3 — Anti-abuso básico
 
-- [ ] Cooldown por `(userId, command)` em memória
-- [ ] Ignorar spam de comandos inválidos (resposta curta, sem flood)
+- [x] Cooldown por `(userId, command)` em memória
+- [x] Ignorar spam de comandos inválidos (resposta curta, sem flood)
 
-**Entregável 2.2:** engine pronto, ainda sem jogo implementado, mas testável com mock.
+**Entregável 2.2:** engine pronto, ainda sem jogo implementado, mas testável com mock. ✅
+
+**Mock disponível:** `!demo start | join | status | end | help`
 
 ---
 
@@ -201,21 +205,21 @@ interface MiniGame {
 
 #### Etapa 2.3.1 — Lógica pura (`tttGame.ts`)
 
-- [ ] Estado: `board: (null | 'X' | 'O')[]`, `currentTurn`, `players`
-- [ ] Validações: posição livre, turno correto, partida ativa
-- [ ] Detecção: vitória (8 combinações), empate, jogo em andamento
-- [ ] **Zero dependência de chat/API** — testável isoladamente
+- [x] Estado: `board: (null | 'X' | 'O')[]`, `currentTurn`, `players`
+- [x] Validações: posição livre, turno correto, partida ativa
+- [x] Detecção: vitória (8 combinações), empate, jogo em andamento
+- [x] **Zero dependência de chat/API** — testável isoladamente
 
 #### Etapa 2.3.2 — Renderer (`tttRenderer.ts`)
 
-- [ ] Formatar tabuleiro ASCII/emoji para chat Kick (≤500 chars)
-- [ ] Mensagens de turno: `@playerX, sua vez! Use !ttt 5`
-- [ ] Anúncio de fim: vitória, empate, desistência
+- [x] Formatar tabuleiro ASCII/emoji para chat Kick (≤500 chars)
+- [x] Mensagens de turno: `@playerX, sua vez! Use !ttt 5`
+- [x] Anúncio de fim: vitória, empate, desistência
 
 #### Etapa 2.3.3 — Commands handler (`tttCommands.ts`)
 
-- [ ] Integrar com `GameManager` + `PlayerRepository`
-- [ ] Fluxo mínimo:
+- [x] Integrar com `GameManager` + `PlayerRepository`
+- [x] Fluxo mínimo:
   1. Viewer A: `!ttt join` → cria partida, espera oponente
   2. Viewer B: `!ttt join` → entra como O, inicia jogo
   3. Alternância de jogadas até fim
@@ -223,12 +227,10 @@ interface MiniGame {
 
 #### Etapa 2.3.4 — Integração streamer vs viewer
 
-- [ ] Identificar streamer pelo `broadcaster_user_id` ou slug do canal
-- [ ] Opção A (simples): qualquer viewer pode jogar contra qualquer viewer
-- [ ] Opção B (mais alinhada ao objetivo): streamer sempre é X, viewer desafiado é O
-- [ ] **Recomendação:** começar com Opção A; evoluir para B na 2.3.4
+- [x] Opção A implementada: qualquer viewer pode jogar contra qualquer viewer
+- [ ] Opção B (streamer sempre X): evolução futura
 
-**Entregável 2.3:** partida completa jogável no chat, com timeout e persistência.
+**Entregável 2.3:** partida completa jogável no chat, com timeout e persistência. ✅
 
 ---
 

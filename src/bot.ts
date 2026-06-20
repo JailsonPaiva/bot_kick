@@ -9,6 +9,7 @@ import { WsListener, resolveChatroomId } from "./chat/wsListener.js";
 import type { ChatMessage } from "./chat/types.js";
 import { createCommandRouter } from "./commands/index.js";
 import { initDatabase, closeDatabase } from "./db/index.js";
+import { createGameServices } from "./games/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 
@@ -28,7 +29,8 @@ async function main(): Promise<void> {
     getAuthenticatedBroadcasterId(),
   ]);
 
-  const router = createCommandRouter();
+  const { gameManager, registry } = createGameServices();
+  const router = createCommandRouter(registry);
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
@@ -45,6 +47,7 @@ async function main(): Promise<void> {
     const commands = router.getRegisteredCommands().map((c) => `!${c}`).join(" | ");
     logger.info("Bot online — aguardando mensagens no chat...");
     logger.info(`Comandos: ${commands}`);
+    logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt board | !demo start");
   });
 
   listener.on("error", (err: Error) => {
@@ -56,6 +59,7 @@ async function main(): Promise<void> {
   const shutdown = (): void => {
     logger.info("Encerrando bot...");
     listener.disconnect();
+    gameManager.shutdown();
     closeDatabase();
     process.exit(0);
   };

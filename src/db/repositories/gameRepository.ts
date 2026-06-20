@@ -57,6 +57,18 @@ export class GameRepository {
     return row ?? null;
   }
 
+  findAllActive(): GameRecord[] {
+    return this.db
+      .prepare(`SELECT * FROM games WHERE status = 'active' ORDER BY started_at ASC`)
+      .all() as GameRecord[];
+  }
+
+  updateBoardState(gameId: string, boardState: string): void {
+    this.db
+      .prepare("UPDATE games SET board_state = ? WHERE id = ?")
+      .run(boardState, gameId);
+  }
+
   finish(
     gameId: string,
     winnerId: number | null,

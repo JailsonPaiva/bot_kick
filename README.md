@@ -66,6 +66,14 @@ A Kick protege `kick.com/api/v2/channels/...` com Cloudflare. Requisições do N
 | `!echo <texto>` | Repete o texto informado |
 | `!ping` | `@<username> pong! 🏓` |
 | `!auth` | `@<username> autenticado como <bot_slug> ✅` |
+| `!demo start` | Inicia partida demo (aguarda oponente) — valida o Game Engine |
+| `!demo join` | Entra como oponente na partida demo |
+| `!demo status` | Mostra status da partida demo |
+| `!demo end` | Encerra partida demo |
+| `!ttt join` | Cria ou entra em partida de jogo da velha |
+| `!ttt 1-9` | Joga na posição do tabuleiro |
+| `!ttt board` | Exibe o tabuleiro atual |
+| `!ttt forfeit` | Desiste da partida |
 
 ## Fluxo OAuth (resumo)
 
@@ -88,6 +96,7 @@ src/
 ├── commands/   Parser, router e handlers de comando
 ├── config/     Configuração de jogos (timeouts, cooldowns)
 ├── db/         SQLite, migrations e repositories
+├── games/      Engine de mini games, registry e demo mock
 ├── utils/      Logger, helpers de env
 └── bot.ts      Entrypoint (wiring)
 ```
