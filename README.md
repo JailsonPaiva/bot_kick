@@ -132,6 +132,8 @@ O bot agora expõe uma API REST completa:
 
 Consulte [docs/API-DASHBOARD.md](docs/API-DASHBOARD.md) para detalhes.
 
+Para deploy em produção com custo zero, veja [docs/DEPLOY-PRODUCAO.md](docs/DEPLOY-PRODUCAO.md).
+
 ### Dashboard Web
 
 Interface administrativa para gerenciar o bot:

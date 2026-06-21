@@ -98,7 +98,7 @@ npm run build:web
 npm start
 ```
 
-Para servir o dashboard em produção, use Nginx/Caddy para servir `web/dist/` ou Vercel/Netlify.
+Guia completo de deploy: [docs/DEPLOY-PRODUCAO.md](docs/DEPLOY-PRODUCAO.md)
 
 ---
 

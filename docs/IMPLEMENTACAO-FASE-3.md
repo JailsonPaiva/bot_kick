@@ -328,7 +328,7 @@ bot_kick/
 ### Curto Prazo (1-2 semanas)
 1. Implementar interface web para jogadores (Fase 3.2)
 2. Adicionar eventos Socket.io no bot para atualização em tempo real
-3. Testar em ambiente de produção
+3. Testar em ambiente de produção — ver [DEPLOY-PRODUCAO.md](DEPLOY-PRODUCAO.md)
 
 ### Médio Prazo (1 mês)
 4. Mini game Quiz/Trivia completo
