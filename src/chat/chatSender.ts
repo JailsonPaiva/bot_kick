@@ -5,6 +5,7 @@
 
 import axios, { type AxiosError } from "axios";
 import { getValidToken } from "../auth/authManager.js";
+import { gameConfig } from "../config/gameConfig.js";
 import { logger } from "../utils/logger.js";
 
 const CHAT_URL = "https://api.kick.com/public/v1/chat";
@@ -26,14 +27,23 @@ interface QueuedMessage {
 let queue: QueuedMessage[] = [];
 let processing = false;
 
+function formatChatContent(content: string): string {
+  const trimmed = content.trim();
+  if (!gameConfig.botMessagePrefix || trimmed.startsWith("[BOT]")) {
+    return trimmed;
+  }
+  return `[BOT] ${trimmed}`;
+}
+
 function truncateContent(content: string): string {
-  if (content.length <= MAX_MESSAGE_LENGTH) {
-    return content;
+  const formatted = formatChatContent(content);
+  if (formatted.length <= MAX_MESSAGE_LENGTH) {
+    return formatted;
   }
   logger.warn(
-    `Mensagem truncada de ${content.length} para ${MAX_MESSAGE_LENGTH} caracteres`
+    `Mensagem truncada de ${formatted.length} para ${MAX_MESSAGE_LENGTH} caracteres`
   );
-  return content.slice(0, MAX_MESSAGE_LENGTH);
+  return formatted.slice(0, MAX_MESSAGE_LENGTH);
 }
 
 async function postMessage(

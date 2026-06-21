@@ -91,7 +91,7 @@ export function playMove(
   }
 
   if (state.currentTurn !== symbol) {
-    return { ok: false, error: "Não é sua vez." };
+    return { ok: false, error: "Não é sua vez. Aguarde o oponente." };
   }
 
   const index = position - 1;

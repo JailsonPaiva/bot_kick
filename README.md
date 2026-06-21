@@ -111,6 +111,7 @@ src/
 | `npm run dev` | Executa o bot com tsx (desenvolvimento) |
 | `npm run build` | Compila TypeScript para `dist/` |
 | `npm start` | Executa a versão compilada |
+| `npm test` | Executa testes unitários e de integração |
 
 ## Próximos passos (Fase 2)
 

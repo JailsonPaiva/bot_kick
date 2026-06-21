@@ -7,6 +7,7 @@ import { gameConfig } from "../../config/gameConfig.js";
 import { GameRepository } from "../../db/repositories/gameRepository.js";
 import { PlayerRepository } from "../../db/repositories/playerRepository.js";
 import { logger } from "../../utils/logger.js";
+import { parseTttState } from "../ttt/tttGame.js";
 import type {
   ActiveGameSession,
   EndGameParams,
@@ -33,27 +34,69 @@ export class GameManager {
   }
 
   recoverActiveGames(defaultBroadcasterId?: number): void {
+    if (!gameConfig.recoverGamesOnBoot) {
+      logger.info("Recuperação de partidas desabilitada (RECOVER_GAMES_ON_BOOT=false)");
+      return;
+    }
+
     const activeRecords = this.gameRepository.findAllActive();
+    if (activeRecords.length === 0) {
+      logger.info("Nenhuma partida active para recuperar");
+      return;
+    }
+
+    const seenChannels = new Set<string>();
+    let recovered = 0;
+    let abandoned = 0;
 
     for (const record of activeRecords) {
-      if (record.game_type !== "ttt") {
-        logger.info(
-          `Partida recuperada (${record.game_type}): ${record.id} — use !${record.game_type} end para encerrar`
+      if (seenChannels.has(record.channel_slug)) {
+        logger.warn(
+          `Partida ${record.id} cancelada por restart (duplicata no canal ${record.channel_slug})`
         );
+        this.gameRepository.abandon(record.id);
+        abandoned++;
+        continue;
+      }
+
+      if (record.game_type !== "ttt") {
+        logger.warn(
+          `Partida ${record.id} cancelada por restart (tipo ${record.game_type} não recuperável)`
+        );
+        this.gameRepository.abandon(record.id);
+        abandoned++;
+        continue;
       }
 
       const playerX = this.playerRepository.findById(record.player_x_id);
       const playerO = this.playerRepository.findById(record.player_o_id);
 
       if (!playerX || !playerO) {
-        logger.warn(`Partida ${record.id} inválida no banco — abandonando`);
+        logger.warn(`Partida ${record.id} cancelada por restart (jogadores inválidos no banco)`);
         this.gameRepository.abandon(record.id);
+        abandoned++;
         continue;
       }
 
-      const state = record.board_state
-        ? (JSON.parse(record.board_state) as Record<string, unknown>)
-        : {};
+      let state: Record<string, unknown> = {};
+      if (record.board_state) {
+        try {
+          state = JSON.parse(record.board_state) as Record<string, unknown>;
+        } catch {
+          logger.warn(`Partida ${record.id} cancelada por restart (board_state corrompido)`);
+          this.gameRepository.abandon(record.id);
+          abandoned++;
+          continue;
+        }
+      }
+
+      if (!parseTttState(state)) {
+        logger.warn(`Partida ${record.id} cancelada por restart (estado ttt inválido)`);
+        this.gameRepository.abandon(record.id);
+        abandoned++;
+        continue;
+      }
+
       const broadcasterId =
         typeof state.broadcasterId === "number" && state.broadcasterId > 0
           ? state.broadcasterId
@@ -74,11 +117,17 @@ export class GameManager {
       };
 
       this.sessions.set(record.channel_slug, session);
+      seenChannels.add(record.channel_slug);
       this.scheduleTimeout(session);
+      recovered++;
       logger.info(
-        `Partida recuperada: ${record.id} (${record.game_type}) — ${session.playerX.username} vs ${playerO.username}`
+        `Partida recuperada: ${record.id} (ttt) — ${session.playerX.username} vs ${playerO.username}`
       );
     }
+
+    logger.info(
+      `Recuperação concluída: ${recovered} partida(s) retomada(s), ${abandoned} cancelada(s)`
+    );
   }
 
   getActiveSession(channelSlug: string): ActiveGameSession | null {

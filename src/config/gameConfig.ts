@@ -9,6 +9,14 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
+  return fallback;
+}
+
 export const gameConfig = {
   /** Tempo máximo sem jogada antes de cancelar partida (ms) */
   gameTimeoutMs: parsePositiveInt(process.env.GAME_TIMEOUT_MS, 5 * 60 * 1000),
@@ -21,4 +29,10 @@ export const gameConfig = {
 
   /** Caminho do arquivo SQLite */
   databasePath: process.env.DATABASE_PATH ?? "data/bot.db",
+
+  /** Prefixo [BOT] nas mensagens enviadas ao chat */
+  botMessagePrefix: parseBoolean(process.env.BOT_MESSAGE_PREFIX, true),
+
+  /** Recuperar partidas active do SQLite ao iniciar o bot */
+  recoverGamesOnBoot: parseBoolean(process.env.RECOVER_GAMES_ON_BOOT, true),
 } as const;
