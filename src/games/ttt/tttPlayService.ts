@@ -31,6 +31,12 @@ export interface ChatPlayer {
   slug: string;
 }
 
+export interface GameFinishOutcome {
+  winner: TttSymbol | null;
+  winnerUsername: string | null;
+  reason: "win" | "draw" | "forfeit";
+}
+
 export interface PlayGameView {
   gameId: string;
   channelSlug: string;
@@ -42,12 +48,14 @@ export interface PlayGameView {
   yourSymbol: TttSymbol | null;
   isYourTurn: boolean;
   winner: TttSymbol | null;
-  finishedReason: string | null;
+  winnerUsername: string | null;
+  finishedReason: "win" | "draw" | "forfeit" | null;
 }
 
 export function buildPlayGameView(
   session: ActiveGameSession | null,
-  viewerKickUserId: number
+  viewerKickUserId: number,
+  outcome?: GameFinishOutcome
 ): PlayGameView | null {
   if (!session || session.gameType !== "ttt") return null;
 
@@ -58,10 +66,12 @@ export function buildPlayGameView(
     session.playerO?.kickUserId
   );
 
+  const isFinished = Boolean(outcome);
+
   return {
     gameId: session.id,
     channelSlug: session.channelSlug,
-    status: session.status,
+    status: isFinished ? "finished" : session.status,
     playerX: {
       username: session.playerX.username,
       kickUserId: session.playerX.kickUserId,
@@ -77,20 +87,24 @@ export function buildPlayGameView(
     board: state?.board ?? Array<Cell>(9).fill(null),
     currentTurn: state?.currentTurn ?? "X",
     yourSymbol,
-    isYourTurn: Boolean(state && yourSymbol && state.currentTurn === yourSymbol),
-    winner: null,
-    finishedReason: null,
+    isYourTurn: isFinished
+      ? false
+      : Boolean(state && yourSymbol && state.currentTurn === yourSymbol),
+    winner: outcome?.winner ?? null,
+    winnerUsername: outcome?.winnerUsername ?? null,
+    finishedReason: outcome?.reason ?? null,
   };
 }
 
 export function broadcastSessionUpdate(
   session: ActiveGameSession | null,
   viewerKickUserId: number,
-  event: "start" | "move" | "end" | "waiting" = "move"
+  event: "start" | "move" | "end" | "waiting" = "move",
+  outcome?: GameFinishOutcome
 ): void {
   if (!session) return;
 
-  const view = buildPlayGameView(session, viewerKickUserId);
+  const view = buildPlayGameView(session, viewerKickUserId, outcome);
   if (!view) return;
 
   broadcastGameUpdate(session.channelSlug, viewerKickUserId, view, event);
@@ -98,11 +112,12 @@ export function broadcastSessionUpdate(
 
 export function broadcastSessionToPlayers(
   session: ActiveGameSession,
-  event: "start" | "move" | "end" | "waiting" = "move"
+  event: "start" | "move" | "end" | "waiting" = "move",
+  outcome?: GameFinishOutcome
 ): void {
-  broadcastSessionUpdate(session, session.playerX.kickUserId, event);
+  broadcastSessionUpdate(session, session.playerX.kickUserId, event, outcome);
   if (session.playerO) {
-    broadcastSessionUpdate(session, session.playerO.kickUserId, event);
+    broadcastSessionUpdate(session, session.playerO.kickUserId, event, outcome);
   }
 }
 
@@ -146,7 +161,12 @@ export interface TttMoveDeps {
 }
 
 export type TttMoveResult =
-  | { ok: true; announceMessage?: string; session: ActiveGameSession }
+  | {
+      ok: true;
+      announceMessage?: string;
+      session: ActiveGameSession;
+      outcome?: GameFinishOutcome;
+    }
   | { ok: false; error: string };
 
 export async function executeTttMove(
@@ -225,6 +245,11 @@ export async function executeTttMove(
       stats.playerX,
       stats.playerO
     );
+    const outcome: GameFinishOutcome = {
+      winner: null,
+      winnerUsername: null,
+      reason: "draw",
+    };
     await gameManager.endGame({
       channelSlug,
       reason: "finished",
@@ -232,8 +257,8 @@ export async function executeTttMove(
       boardState: serializeTttState(result.state),
       announceMessage,
     });
-    broadcastSessionToPlayers(updatedSession, "end");
-    return { ok: true, announceMessage, session: updatedSession };
+    broadcastSessionToPlayers(updatedSession, "end", outcome);
+    return { ok: true, announceMessage, session: updatedSession, outcome };
   }
 
   const winnerSymbol = result.winner;
@@ -260,6 +285,12 @@ export async function executeTttMove(
     stats.winner
   );
 
+  const outcome: GameFinishOutcome = {
+    winner: winnerSymbol,
+    winnerUsername: winnerName,
+    reason: "win",
+  };
+
   await gameManager.endGame({
     channelSlug,
     reason: "finished",
@@ -267,6 +298,6 @@ export async function executeTttMove(
     boardState: serializeTttState(result.state),
     announceMessage,
   });
-  broadcastSessionToPlayers(updatedSession, "end");
-  return { ok: true, announceMessage, session: updatedSession };
+  broadcastSessionToPlayers(updatedSession, "end", outcome);
+  return { ok: true, announceMessage, session: updatedSession, outcome };
 }

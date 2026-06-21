@@ -11,7 +11,8 @@ export interface PlayGameView {
   yourSymbol: 'X' | 'O' | null
   isYourTurn: boolean
   winner: 'X' | 'O' | null
-  finishedReason: string | null
+  winnerUsername: string | null
+  finishedReason: 'win' | 'draw' | 'forfeit' | null
   token?: string
 }
 

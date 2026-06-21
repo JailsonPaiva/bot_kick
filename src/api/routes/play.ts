@@ -85,7 +85,10 @@ export function createPlayRouter(services: GameServices): Router {
     }
 
     const activeSession = services.gameManager.getActiveSession(player.channelSlug);
-    const view = buildPlayGameView(activeSession, player.kickUserId);
+    const finished = Boolean(result.outcome);
+    const view = finished
+      ? buildPlayGameView(result.session, player.kickUserId, result.outcome)
+      : buildPlayGameView(activeSession, player.kickUserId);
 
     const response: ApiResponse<{
       game: PlayGameView | null;
@@ -95,7 +98,7 @@ export function createPlayRouter(services: GameServices): Router {
       success: true,
       data: {
         game: view,
-        finished: !activeSession,
+        finished,
         message: result.announceMessage,
       },
     };

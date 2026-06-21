@@ -329,7 +329,11 @@ export function createTttGame(
 
     const state = getTttState(session);
 
-    broadcastSessionToPlayers(session, "end");
+    broadcastSessionToPlayers(session, "end", {
+      winner: winnerSymbol,
+      winnerUsername: winnerName,
+      reason: "forfeit",
+    });
 
     await gameManager.endGame({
       channelSlug: command.channelSlug,

@@ -10,6 +10,15 @@ export function usePlaySession(token: string | null) {
   const [moving, setMoving] = useState(false)
   const movingRef = useRef(false)
   const [lastEvent, setLastEvent] = useState<string | null>(null)
+  const [showResultModal, setShowResultModal] = useState(false)
+
+  const handleGameFinished = useCallback((finishedGame: PlayGameView) => {
+    setGame(finishedGame)
+    setLastEvent('end')
+    setShowResultModal(true)
+    movingRef.current = false
+    setMoving(false)
+  }, [])
 
   const loadSession = useCallback(async () => {
     if (!token) {
@@ -22,6 +31,7 @@ export function usePlaySession(token: string | null) {
       setError(null)
       const data = await fetchPlaySession(token)
       setGame(data)
+      setShowResultModal(false)
     } catch {
       setError('Sessão expirada ou partida encerrada. Use !ttt web no chat novamente.')
     } finally {
@@ -45,6 +55,11 @@ export function usePlaySession(token: string | null) {
     })
 
     socket.on('game:update', (payload: GameUpdateEvent) => {
+      if (payload.event === 'end' || payload.game.status === 'finished') {
+        handleGameFinished(payload.game)
+        return
+      }
+
       setGame(payload.game)
       setLastEvent(payload.event)
       movingRef.current = false
@@ -58,11 +73,11 @@ export function usePlaySession(token: string | null) {
     return () => {
       socket.disconnect()
     }
-  }, [token])
+  }, [token, handleGameFinished])
 
   const makeMove = useCallback(
     async (position: number) => {
-      if (!token || movingRef.current) return
+      if (!token || movingRef.current || showResultModal) return
 
       movingRef.current = true
       setMoving(true)
@@ -71,10 +86,12 @@ export function usePlaySession(token: string | null) {
       try {
         const result = await submitMove(token, position)
         if (result.game) {
-          setGame(result.game)
-        } else if (result.finished) {
-          setGame(null)
-          setError('Partida encerrada.')
+          if (result.finished) {
+            handleGameFinished(result.game)
+          } else {
+            setGame(result.game)
+            setLastEvent('move')
+          }
         }
       } catch (err) {
         const message =
@@ -85,10 +102,24 @@ export function usePlaySession(token: string | null) {
         setMoving(false)
       }
     },
-    [token]
+    [token, showResultModal, handleGameFinished]
   )
 
-  return { game, loading, error, moving, lastEvent, makeMove, reload: loadSession }
+  const dismissResult = useCallback(() => {
+    setShowResultModal(false)
+  }, [])
+
+  return {
+    game,
+    loading,
+    error,
+    moving,
+    lastEvent,
+    showResultModal,
+    makeMove,
+    dismissResult,
+    reload: loadSession,
+  }
 }
 
 function axiosErrorMessage(err: unknown): string | null {

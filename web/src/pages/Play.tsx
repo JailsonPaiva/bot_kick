@@ -2,12 +2,21 @@ import { useSearchParams } from 'react-router-dom'
 import { usePlaySession } from '../hooks/usePlaySession'
 import TicTacToeBoard from '../components/TicTacToeBoard'
 import PlayerInfo from '../components/PlayerInfo'
+import GameResultModal from '../components/GameResultModal'
 
 export default function Play() {
   const [params] = useSearchParams()
   const token = params.get('token')
-  const { game, loading, error, moving, lastEvent, makeMove, reload } =
-    usePlaySession(token)
+  const {
+    game,
+    loading,
+    error,
+    moving,
+    showResultModal,
+    makeMove,
+    dismissResult,
+    reload,
+  } = usePlaySession(token)
 
   if (loading) {
     return (
@@ -41,7 +50,8 @@ export default function Play() {
     )
   }
 
-  const statusMessage = getStatusMessage(game, lastEvent)
+  const isFinished = game.status === 'finished'
+  const statusMessage = getStatusMessage(game)
 
   return (
     <PageShell>
@@ -58,7 +68,8 @@ export default function Play() {
         {game.status === 'waiting' ? (
           <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 text-center mb-6">
             <p className="text-yellow-200">
-              Aguardando oponente entrar com <code className="text-yellow-100">!ttt join</code>
+              Aguardando oponente entrar com{' '}
+              <code className="text-yellow-100">!ttt join</code>
             </p>
           </div>
         ) : (
@@ -67,7 +78,7 @@ export default function Play() {
               board={game.board}
               yourSymbol={game.yourSymbol}
               isYourTurn={game.isYourTurn}
-              disabled={moving || game.status !== 'active'}
+              disabled={moving || isFinished}
               onMove={(position) => void makeMove(position)}
             />
 
@@ -84,6 +95,12 @@ export default function Play() {
           <p className="mt-1">Jogadas no chat também atualizam esta tela em tempo real.</p>
         </footer>
       </div>
+
+      <GameResultModal
+        game={game}
+        open={showResultModal && isFinished}
+        onClose={dismissResult}
+      />
     </PageShell>
   )
 }
@@ -97,15 +114,12 @@ function PageShell({ children }: { children: React.ReactNode }) {
 }
 
 function getStatusMessage(
-  game: NonNullable<ReturnType<typeof usePlaySession>['game']>,
-  lastEvent: string | null
+  game: NonNullable<ReturnType<typeof usePlaySession>['game']>
 ): string {
   if (game.status === 'finished') {
+    if (game.finishedReason === 'draw') return 'Partida encerrada em empate.'
+    if (game.winnerUsername) return `${game.winnerUsername} venceu a partida!`
     return 'Partida encerrada.'
-  }
-
-  if (lastEvent === 'end') {
-    return 'Partida finalizada!'
   }
 
   if (game.isYourTurn) {
