@@ -102,4 +102,20 @@ export class PlayerRepository {
 
     return rows.map(mapPlayerRow);
   }
+
+  findByUsernameOrSlug(query: string): PlayerRecord | null {
+    const normalized = query.replace(/^@/, "").trim();
+    if (!normalized) return null;
+
+    const row = this.db
+      .prepare(
+        `SELECT * FROM players
+         WHERE LOWER(username) = LOWER(?)
+            OR LOWER(slug) = LOWER(?)
+         LIMIT 1`
+      )
+      .get(normalized, normalized) as PlayerRecord | undefined;
+
+    return row ? mapPlayerRow(row) : null;
+  }
 }

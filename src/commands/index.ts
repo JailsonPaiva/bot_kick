@@ -2,16 +2,25 @@
  * Factory do roteador de comandos com handlers MVP e mini games registrados.
  */
 
+import type { PlayerRepository } from "../db/repositories/playerRepository.js";
 import type { GameRegistry } from "../games/registry.js";
+import { createRankHandler } from "../rank/rankHandler.js";
 import { CommandRouter } from "./router.js";
 import { handleAuth, handleEcho, handlePing } from "./handlers/mvpHandlers.js";
 
-export function createCommandRouter(gameRegistry?: GameRegistry): CommandRouter {
+export function createCommandRouter(
+  gameRegistry?: GameRegistry,
+  playerRepository?: PlayerRepository
+): CommandRouter {
   const router = new CommandRouter();
 
   router.register("echo", handleEcho);
   router.register("ping", handlePing);
   router.register("auth", handleAuth);
+
+  if (playerRepository) {
+    router.register("rank", createRankHandler(playerRepository));
+  }
 
   if (gameRegistry) {
     gameRegistry.attachToRouter(router);

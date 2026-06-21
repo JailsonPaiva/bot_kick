@@ -74,6 +74,9 @@ A Kick protege `kick.com/api/v2/channels/...` com Cloudflare. Requisições do N
 | `!ttt 1-9` | Joga na posição do tabuleiro |
 | `!ttt board` | Exibe o tabuleiro atual |
 | `!ttt forfeit` | Desiste da partida |
+| `!rank` | Top 10 do ranking (pontos, vitórias, empates, derrotas) |
+| `!rank me` | Suas estatísticas no ranking |
+| `!rank @usuario` | Estatísticas de um jogador específico |
 
 ## Fluxo OAuth (resumo)
 

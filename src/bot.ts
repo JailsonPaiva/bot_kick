@@ -31,8 +31,8 @@ async function main(): Promise<void> {
 
   const services = createGameServices();
   setupGameServices(services, broadcasterId);
-  const { gameManager, registry } = services;
-  const router = createCommandRouter(registry);
+  const { gameManager, registry, playerRepository } = services;
+  const router = createCommandRouter(registry, playerRepository);
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
@@ -50,6 +50,7 @@ async function main(): Promise<void> {
     logger.info("Bot online — aguardando mensagens no chat...");
     logger.info(`Comandos: ${commands}`);
     logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt board | !demo start");
+    logger.info("Ranking: !rank | !rank me | !rank @usuario");
   });
 
   listener.on("error", (err: Error) => {
