@@ -12,6 +12,8 @@ import { createStatusRouter } from "./routes/status.js";
 import { createGamesRouter } from "./routes/games.js";
 import { createPlayersRouter } from "./routes/players.js";
 import { createAuthRouter } from "./routes/auth.js";
+import { createPlayRouter } from "./routes/play.js";
+import { initGameEvents } from "./gameEvents.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -54,6 +56,7 @@ export function startApiServer(services: GameServices): {
     )
   );
   app.use("/api", createPlayersRouter(services.playerRepository));
+  app.use("/api", createPlayRouter(services));
 
   // Rota raiz
   app.get("/", (_req, res) => {
@@ -68,18 +71,14 @@ export function startApiServer(services: GameServices): {
         "DELETE /api/games/:id",
         "GET /api/players",
         "GET /api/players/:id",
+        "GET /api/play/session",
+        "POST /api/play/move",
       ],
     });
   });
 
-  // WebSocket
-  io.on("connection", (socket) => {
-    logger.info(`[WebSocket] Cliente conectado: ${socket.id}`);
-
-    socket.on("disconnect", () => {
-      logger.info(`[WebSocket] Cliente desconectado: ${socket.id}`);
-    });
-  });
+  // WebSocket — eventos de partida em tempo real
+  initGameEvents(io);
 
   server.listen(API_PORT, () => {
     logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);

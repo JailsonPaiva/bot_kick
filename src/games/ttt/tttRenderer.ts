@@ -6,14 +6,15 @@ import type { PlayerRecord } from "../../db/types.js";
 import type { Cell, TttSymbol } from "./tttGame.js";
 
 export const TTT_HELP =
-  "!ttt join | !ttt 1-9 | !ttt board | !ttt forfeit | !ttt help";
+  "!ttt join | !ttt 1-9 | !ttt board | !ttt web | !ttt forfeit | !ttt help";
 
 export const TTT_HELP_FULL = [
   "📋 Jogo da velha:",
   "1) !ttt join — cria ou entra na partida",
   "2) !ttt 1-9 — joga na posição do tabuleiro",
-  "3) !ttt board — vê o tabuleiro",
-  "4) !ttt forfeit — desiste",
+  "3) !ttt web — link para jogar no navegador",
+  "4) !ttt board — vê o tabuleiro",
+  "5) !ttt forfeit — desiste",
   "Tabuleiro: posições 1-9 (centro = 5)",
 ].join(" | ");
 

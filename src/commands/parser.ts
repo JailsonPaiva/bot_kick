@@ -34,6 +34,7 @@ export function parseCommand(content: string): ParsedCommand | null {
     "join",
     "forfeit",
     "board",
+    "web",
     "help",
     "challenge",
     "me",

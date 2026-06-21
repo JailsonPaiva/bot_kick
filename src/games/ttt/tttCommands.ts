@@ -8,24 +8,20 @@ import { logger } from "../../utils/logger.js";
 import type { ActiveGameSession, GameHandlerContext, MiniGame } from "../types.js";
 import {
   createInitialState,
-  dbIdForSymbol,
   parseTttState,
-  playMove,
   serializeTttState,
   symbolForKickUserId,
   usernameForSymbol,
+  dbIdForSymbol,
   type TttSymbol,
 } from "./tttGame.js";
 import {
   renderBoard,
-  renderDraw,
   renderForfeit,
   renderGameStart,
   renderStatusActive,
   renderStatusWaiting,
-  renderTurn,
   renderWaiting,
-  renderWin,
   TTT_HELP,
   TTT_HELP_FULL,
 } from "./tttRenderer.js";
@@ -34,6 +30,11 @@ import {
   registerPlayer,
   registerSessionPlayers,
 } from "./tttService.js";
+import {
+  broadcastSessionToPlayers,
+  createPlayLinkForPlayer,
+  executeTttMove,
+} from "./tttPlayService.js";
 
 function sender(ctx: GameHandlerContext) {
   return {
@@ -122,6 +123,7 @@ export function createTttGame(
             freshState.board
           )
         );
+        broadcastSessionToPlayers(session, "start");
         logger.info(`[TTT] ${player.username} entrou — partida ${session.id}`);
       } catch (err) {
         const message =
@@ -145,6 +147,11 @@ export function createTttGame(
 
     ensurePlayerRegistered(playerRepository, ctx);
 
+    const waitingSession = gameManager.getActiveSession(command.channelSlug);
+    if (waitingSession) {
+      broadcastSessionToPlayers(waitingSession, "waiting");
+    }
+
     await sendChat(
       command.broadcasterId,
       renderWaiting(player.username)
@@ -158,9 +165,34 @@ export function createTttGame(
   ): Promise<void> {
     const { command, gameManager, sendChat } = ctx;
     const player = sender(ctx);
-    const rawSession = gameManager.getActiveSession(command.channelSlug);
 
-    if (!rawSession) {
+    const result = await executeTttMove(
+      { gameManager, gameRepository, playerRepository },
+      command.channelSlug,
+      player,
+      position
+    );
+
+    if (!result.ok) {
+      await sendChat(
+        command.broadcasterId,
+        `@${player.username} ${result.error}`
+      );
+      return;
+    }
+
+    const stillActive = gameManager.getActiveSession(command.channelSlug);
+    if (stillActive && result.announceMessage) {
+      await sendChat(command.broadcasterId, result.announceMessage);
+    }
+  }
+
+  async function handleWeb(ctx: GameHandlerContext): Promise<void> {
+    const { command, gameManager, sendChat } = ctx;
+    const player = sender(ctx);
+    const session = gameManager.getActiveSession(command.channelSlug);
+
+    if (!session || session.gameType !== "ttt") {
       await sendChat(
         command.broadcasterId,
         `@${player.username} nenhuma partida ativa. Use !ttt join.`
@@ -168,40 +200,11 @@ export function createTttGame(
       return;
     }
 
-    const session = await requireTttSession(
-      rawSession,
-      sendChat,
-      command.broadcasterId
-    );
-    if (!session || session.status !== "active" || !session.playerO) {
-      if (session?.status === "waiting") {
-        await sendChat(
-          command.broadcasterId,
-          `@${player.username} aguardando oponente. Outro jogador use !ttt join.`
-        );
-      }
-      return;
-    }
+    const isPlayer =
+      session.playerX.kickUserId === player.kickUserId ||
+      session.playerO?.kickUserId === player.kickUserId;
 
-    const state = getTttState(session);
-    if (!state) {
-      logger.error(`[TTT] Estado inválido na partida ${session.id}`, session.state);
-      const repaired = createInitialState(command.broadcasterId);
-      gameManager.updateState(command.channelSlug, serializeTttState(repaired));
-      await sendChat(
-        command.broadcasterId,
-        `@${player.username} tabuleiro reiniciado. ${renderTurn(session.playerX.username, repaired.board)}`
-      );
-      return;
-    }
-
-    const symbol = symbolForKickUserId(
-      player.kickUserId,
-      session.playerX.kickUserId,
-      session.playerO.kickUserId
-    );
-
-    if (!symbol) {
+    if (!isPlayer) {
       await sendChat(
         command.broadcasterId,
         `@${player.username} você não está nesta partida.`
@@ -209,78 +212,19 @@ export function createTttGame(
       return;
     }
 
-    const result = playMove(state, position, symbol);
-    if (!result.ok) {
-      await sendChat(command.broadcasterId, `@${player.username} ${result.error}`);
-      return;
-    }
-
-    gameManager.updateState(
-      command.channelSlug,
-      serializeTttState(result.state)
-    );
-    gameRepository.recordMove(session.id, symbol === "X" ? session.playerX.dbId : session.playerO!.dbId, position);
-
-    if (result.status === "continue") {
-      const nextUsername = usernameForSymbol(
-        result.state.currentTurn,
-        session.playerX.username,
-        session.playerO.username
-      );
+    const link = createPlayLinkForPlayer(session, player);
+    if (!link) {
       await sendChat(
         command.broadcasterId,
-        renderTurn(nextUsername, result.state.board)
+        `@${player.username} não foi possível gerar o link da web.`
       );
       return;
     }
 
-    if (result.status === "draw") {
-      const stats = applyTttStats(playerRepository, session, "draw");
-      await gameManager.endGame({
-        channelSlug: command.channelSlug,
-        reason: "finished",
-        winnerDbId: null,
-        boardState: serializeTttState(result.state),
-        announceMessage: renderDraw(
-          result.state.board,
-          stats.playerX,
-          stats.playerO
-        ),
-      });
-      logger.info(`[TTT] Empate — partida ${session.id}`);
-      return;
-    }
-
-    const winnerSymbol = result.winner;
-    const winnerName = usernameForSymbol(
-      winnerSymbol,
-      session.playerX.username,
-      session.playerO.username
+    await sendChat(
+      command.broadcasterId,
+      `@${player.username} jogue pela web (válido por 10 min): ${link}`
     );
-    const winnerDbId = dbIdForSymbol(
-      winnerSymbol,
-      session.playerX.dbId,
-      session.playerO.dbId
-    );
-
-    const stats = applyTttStats(
-      playerRepository,
-      session,
-      winnerSymbol === "X" ? "x_win" : "o_win"
-    );
-
-    await gameManager.endGame({
-      channelSlug: command.channelSlug,
-      reason: "finished",
-      winnerDbId,
-      boardState: serializeTttState(result.state),
-      announceMessage: renderWin(
-        winnerName,
-        result.state.board,
-        stats.winner
-      ),
-    });
-    logger.info(`[TTT] ${winnerName} venceu — partida ${session.id}`);
   }
 
   async function handleBoard(ctx: GameHandlerContext): Promise<void> {
@@ -385,6 +329,8 @@ export function createTttGame(
 
     const state = getTttState(session);
 
+    broadcastSessionToPlayers(session, "end");
+
     await gameManager.endGame({
       channelSlug: command.channelSlug,
       reason: "finished",
@@ -458,6 +404,11 @@ export function createTttGame(
 
       if (sub === "forfeit") {
         await handleForfeit(ctx);
+        return;
+      }
+
+      if (sub === "web") {
+        await handleWeb(ctx);
         return;
       }
 

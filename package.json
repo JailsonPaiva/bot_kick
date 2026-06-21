@@ -10,7 +10,7 @@
     "build": "tsc && node scripts/copy-migrations.mjs",
     "build:web": "cd web && npm run build",
     "start": "node dist/bot.js",
-    "test": "tsx --test src/games/ttt/tttGame.test.ts src/db/repositories/repositories.test.ts src/games/engine/gameManager.recover.test.ts"
+    "test": "tsx --test src/games/ttt/tttGame.test.ts src/db/repositories/repositories.test.ts src/games/engine/gameManager.recover.test.ts src/commands/parser.test.ts"
   },
   "engines": {
     "node": ">=20"

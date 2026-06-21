@@ -3,9 +3,11 @@
  */
 
 import type { Request } from "express";
+import type { PlayerTokenPayload } from "./playerAuth.js";
 
 export interface AuthRequest extends Request {
   userId?: string;
+  player?: PlayerTokenPayload;
 }
 
 export interface ApiResponse<T = unknown> {

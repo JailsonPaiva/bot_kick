@@ -54,7 +54,7 @@ async function main(): Promise<void> {
     const commands = router.getRegisteredCommands().map((c) => `!${c}`).join(" | ");
     logger.info("Bot online — aguardando mensagens no chat...");
     logger.info(`Comandos: ${commands}`);
-    logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt board | !demo start");
+    logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt web | !ttt board | !demo start");
     logger.info("Ranking: !rank | !rank me | !rank @usuario");
   });
 
