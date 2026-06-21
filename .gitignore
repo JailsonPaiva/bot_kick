@@ -1,7 +1,34 @@
+# Dependências
 node_modules/
+web/node_modules/
+
+# Build
 dist/
-.env
+web/dist/
+
+# Tokens e dados sensíveis
 .tokens.json
+.env
+web/.env
+
+# Banco de dados
 data/
+*.db
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporários
+*.tmp
+*.temp

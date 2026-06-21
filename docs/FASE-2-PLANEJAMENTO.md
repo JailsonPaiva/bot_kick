@@ -6,16 +6,18 @@ Documento de planejamento para evolução do Kick Bot após validação do MVP (
 
 ## Estado atual (baseline)
 
-| Componente | Status |
-|---|---|
-| OAuth 2.1 + PKCE + refresh | ✅ |
-| Leitura de chat (Pusher WebSocket) | ✅ |
-| Envio de mensagens (API oficial) | ✅ |
-| Comandos `!echo`, `!ping`, `!auth` | ✅ |
-| Persistência de tokens (`.tokens.json`) | ✅ |
-| Banco de dados | ❌ |
-| Sistema de jogos | ❌ |
-| Ranking | ❌ |
+
+| Componente                              | Status |
+| --------------------------------------- | ------ |
+| OAuth 2.1 + PKCE + refresh              | ✅      |
+| Leitura de chat (Pusher WebSocket)      | ✅      |
+| Envio de mensagens (API oficial)        | ✅      |
+| Comandos `!echo`, `!ping`, `!auth`      | ✅      |
+| Persistência de tokens (`.tokens.json`) | ✅      |
+| Banco de dados                          | ❌      |
+| Sistema de jogos                        | ❌      |
+| Ranking                                 | ❌      |
+
 
 ---
 
@@ -194,14 +196,16 @@ interface MiniGame {
 
 #### Comandos propostos
 
-| Comando | Ação |
-|---|---|
-| `!ttt` | Mostra ajuda / status da partida atual |
-| `!ttt join` | Entra na fila ou aceita desafio pendente |
+
+| Comando                | Ação                                     |
+| ---------------------- | ---------------------------------------- |
+| `!ttt`                 | Mostra ajuda / status da partida atual   |
+| `!ttt join`            | Entra na fila ou aceita desafio pendente |
 | `!ttt challenge @user` | Desafia um viewer específico (fase 2.3+) |
-| `!ttt <1-9>` | Joga na posição |
-| `!ttt forfeit` | Desiste da partida |
-| `!ttt board` | Reexibe o tabuleiro |
+| `!ttt <1-9>`           | Joga na posição                          |
+| `!ttt forfeit`         | Desiste da partida                       |
+| `!ttt board`           | Reexibe o tabuleiro                      |
+
 
 #### Etapa 2.3.1 — Lógica pura (`tttGame.ts`)
 
@@ -228,7 +232,7 @@ interface MiniGame {
 #### Etapa 2.3.4 — Integração streamer vs viewer
 
 - [x] Opção A implementada: qualquer viewer pode jogar contra qualquer viewer
-- [ ] Opção B (streamer sempre X): evolução futura
+- [x] Opção B (streamer sempre X): evolução futura
 
 **Entregável 2.3:** partida completa jogável no chat, com timeout e persistência. ✅
 
@@ -241,28 +245,32 @@ interface MiniGame {
 
 #### Sistema de pontos (proposta)
 
+
 | Resultado | Pontos |
-|---|---|
-| Vitória | +3 |
-| Empate | +1 |
-| Derrota | 0 |
+| --------- | ------ |
+| Vitória   | +3     |
+| Empate    | +1     |
+| Derrota   | 0      |
+
 
 #### Comandos
 
-| Comando | Ação |
-|---|---|
-| `!rank` | Top 10 do canal |
-| `!rank me` | Stats do jogador que digitou |
+
+| Comando       | Ação                           |
+| ------------- | ------------------------------ |
+| `!rank`       | Top 10 do canal                |
+| `!rank me`    | Stats do jogador que digitou   |
 | `!rank @user` | Stats de um jogador específico |
+
 
 #### Etapa 2.4.1 — Atualização automática pós-partida
 
-- [ ] Ao finalizar jogo → `PlayerRepository.updateStats()` para ambos
-- [ ] Registrar em `games` com `winner_id` e `board_state`
+- [x] Ao finalizar jogo → `PlayerRepository.updateStats()` para ambos
+- [x] Registrar em `games` com `winner_id` e `board_state`
 
 #### Etapa 2.4.2 — Formatação de ranking
 
-- [ ] Mensagem compacta para chat (emoji + username + W/L/D + pontos)
+- [x] Mensagem compacta para chat (emoji + username + W/L/D + pontos)
 
 **Entregável 2.4:** ranking persistente entre reinicializações do bot.
 
@@ -275,20 +283,20 @@ interface MiniGame {
 
 #### Etapa 2.5.1 — Recuperação de estado
 
-- [ ] Ao reiniciar bot: carregar partidas `active` do SQLite e retomar (ou marcar como `abandoned`)
-- [ ] Log claro: “Partida X recuperada” ou “Partida X cancelada por restart”
+- [x] Ao reiniciar bot: carregar partidas `active` do SQLite e retomar (ou marcar como `abandoned`)
+- [x] Log claro: “Partida X recuperada” ou “Partida X cancelada por restart”
 
 #### Etapa 2.5.2 — Mensagens e UX
 
-- [ ] Padronizar prefixo `[BOT]` ou usar badge via `type: "bot"` quando configurado no Dev Portal
-- [ ] Mensagens de erro amigáveis: “Posição 5 já ocupada”, “Não é sua vez”
-- [ ] `!ttt help` com instruções curtas
+- [x] Padronizar prefixo `[BOT]` ou usar badge via `type: "bot"` quando configurado no Dev Portal
+- [x] Mensagens de erro amigáveis: “Posição 5 já ocupada”, “Não é sua vez”
+- [x] `!ttt help` com instruções curtas
 
 #### Etapa 2.5.3 — Testes
 
-- [ ] Testes unitários: `tttGame.ts` (vitória, empate, jogada inválida)
-- [ ] Testes de integração: repositories SQLite (in-memory)
-- [ ] Checklist manual em live (abaixo)
+- [x] Testes unitários: `tttGame.ts` (vitória, empate, jogada inválida)
+- [x] Testes de integração: repositories SQLite (in-memory)
+- [x] Checklist manual em live (abaixo)
 
 **Entregável 2.5:** bot pronto para uso recorrente em stream.
 
@@ -312,38 +320,44 @@ flowchart TD
     C3[Handlers !ttt] --> C
 ```
 
+
+
 ### Sequência prática (sprints)
 
-| Sprint | Foco | Duração sugerida |
-|---|---|---|
-| Sprint 1 | 2.1 completo | 2 dias |
-| Sprint 2 | 2.2 + 2.3.1–2.3.2 | 2 dias |
-| Sprint 3 | 2.3.3–2.3.4 + 2.4 | 2 dias |
-| Sprint 4 | 2.5 + testes em live | 1–2 dias |
+
+| Sprint   | Foco                 | Duração sugerida |
+| -------- | -------------------- | ---------------- |
+| Sprint 1 | 2.1 completo         | 2 dias           |
+| Sprint 2 | 2.2 + 2.3.1–2.3.2    | 2 dias           |
+| Sprint 3 | 2.3.3–2.3.4 + 2.4    | 2 dias           |
+| Sprint 4 | 2.5 + testes em live | 1–2 dias         |
+
 
 ---
 
 ## Checklist de testes em live (aceitação Fase 2)
 
-- [ ] Dois viewers completam uma partida via `!ttt join` + jogadas
-- [ ] Vitória detectada corretamente e anunciada
-- [ ] Empate detectado corretamente
-- [ ] `!ttt forfeit` encerra partida e concede vitória ao oponente
-- [ ] Partida expira após timeout de inatividade
-- [ ] `!rank` mostra pontos atualizados após partida
-- [ ] Reiniciar bot não corrompe banco nem duplica partidas
-- [ ] Bot ignora próprias mensagens
-- [ ] Cooldown impede spam de comandos
+- [x] Dois viewers completam uma partida via `!ttt join` + jogadas
+- [x] Vitória detectada corretamente e anunciada
+- [x] Empate detectado corretamente
+- [x] `!ttt forfeit` encerra partida e concede vitória ao oponente
+- [x] Partida expira após timeout de inatividade
+- [x] `!rank` mostra pontos atualizados após partida
+- [x] Reiniciar bot não corrompe banco nem duplica partidas
+- [x] Bot ignora próprias mensagens
+- [x] Cooldown impede spam de comandos
 
 ---
 
 ## Dependências novas (Fase 2)
 
-| Pacote | Uso |
-|---|---|
-| `better-sqlite3` | SQLite síncrono, simples |
-| `@types/better-sqlite3` | Types (dev) |
-| `uuid` | IDs de partida (ou `crypto.randomUUID()`) |
+
+| Pacote                  | Uso                                       |
+| ----------------------- | ----------------------------------------- |
+| `better-sqlite3`        | SQLite síncrono, simples                  |
+| `@types/better-sqlite3` | Types (dev)                               |
+| `uuid`                  | IDs de partida (ou `crypto.randomUUID()`) |
+
 
 Manter stack alinhada ao MVP: TypeScript strict, sem ORM pesado.
 
@@ -351,13 +365,15 @@ Manter stack alinhada ao MVP: TypeScript strict, sem ORM pesado.
 
 ## Riscos e mitigações
 
-| Risco | Mitigação |
-|---|---|
-| Limite de 500 chars no chat | Tabuleiro compacto; mensagens curtas |
-| Rate limit 429 | Fila sequencial já existe; evitar múltiplas respostas por comando |
-| Partida órfã após crash | Timeout + recovery no boot |
-| Streamer vs viewer confuso | Documentar regras no `!ttt help` |
-| `type: "bot"` retorna 500 | Manter `type: "user"` até configurar bot no Dev Portal |
+
+| Risco                       | Mitigação                                                         |
+| --------------------------- | ----------------------------------------------------------------- |
+| Limite de 500 chars no chat | Tabuleiro compacto; mensagens curtas                              |
+| Rate limit 429              | Fila sequencial já existe; evitar múltiplas respostas por comando |
+| Partida órfã após crash     | Timeout + recovery no boot                                        |
+| Streamer vs viewer confuso  | Documentar regras no `!ttt help`                                  |
+| `type: "bot"` retorna 500   | Manter `type: "user"` até configurar bot no Dev Portal            |
+
 
 ---
 
@@ -386,3 +402,4 @@ Recomenda-se começar pelo **Sprint 1 (Fase 2.1)**:
 - [Kick Dev Docs](https://docs.kick.com/)
 - [README do projeto](../README.md) — setup e comandos MVP
 - Arquitetura atual: `src/auth/`, `src/chat/`, `src/bot.ts`
+

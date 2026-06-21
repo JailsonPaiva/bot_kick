@@ -10,6 +10,7 @@ import type { ChatMessage } from "./chat/types.js";
 import { createCommandRouter } from "./commands/index.js";
 import { initDatabase, closeDatabase } from "./db/index.js";
 import { createGameServices, setupGameServices } from "./games/index.js";
+import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 
@@ -33,6 +34,10 @@ async function main(): Promise<void> {
   setupGameServices(services, broadcasterId);
   const { gameManager, registry, playerRepository } = services;
   const router = createCommandRouter(registry, playerRepository);
+  
+  // Iniciar API REST e WebSocket
+  const { server: apiServer, io } = startApiServer(services);
+  
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
@@ -63,6 +68,8 @@ async function main(): Promise<void> {
     logger.info("Encerrando bot...");
     listener.disconnect();
     gameManager.shutdown();
+    apiServer.close();
+    io.close();
     closeDatabase();
     process.exit(0);
   };

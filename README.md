@@ -113,14 +113,48 @@ src/
 | `npm start` | Executa a versão compilada |
 | `npm test` | Executa testes unitários e de integração |
 
-## Próximos passos (Fase 2)
+## Fase 2 — Completa ✅
 
-Planejamento detalhado em **[docs/FASE-2-PLANEJAMENTO.md](docs/FASE-2-PLANEJAMENTO.md)**.
+- Jogo da velha funcional (`!ttt`)
+- Sistema de ranking com pontos persistentes
+- Recovery automático de partidas
+- Testes unitários
 
-Resumo:
+## Fase 3 — API e Dashboard Web 🚀
 
-- **Jogo da velha (`!ttt`)** — estado de partida em SQLite, grid 3×3, turnos alternados
-- **Ranking e pontos** — persistência SQLite, tabela de jogadores, vitórias/derrotas/empates
-- **Comandos de jogo** — `!ttt join`, `!ttt <posição>`, `!rank`, timeout de partidas inativas
-- **Moderação básica** — cooldown por usuário, limite de partidas simultâneas
-- **Refatoração de estado** — módulo `games/` com interface genérica de mini game
+### API REST
+
+O bot agora expõe uma API REST completa:
+
+- **Autenticação JWT** para dashboard admin
+- **Endpoints** de status, jogos e ranking
+- **WebSocket** (Socket.io) para atualizações em tempo real
+
+Consulte [docs/API-DASHBOARD.md](docs/API-DASHBOARD.md) para detalhes.
+
+### Dashboard Web
+
+Interface administrativa para gerenciar o bot:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Acesse http://localhost:5173 (senha padrão dev: `admin`)
+
+**Funcionalidades:**
+- Monitoramento ao vivo (status, uptime, partidas ativas)
+- Histórico completo de jogos
+- Ranking de jogadores
+- Cancelamento de partidas
+
+### Próximos Passos
+
+Planejamento completo em `.cursor/plans/evolução_bot_kick_fase_3_*.plan.md`:
+
+- Interface web para jogadores jogarem jogo da velha
+- Mini game Quiz/Trivia
+- Integração CS2/Valorant/LOL
+- OBS Overlays
