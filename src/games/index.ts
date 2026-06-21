@@ -16,6 +16,8 @@ export interface GameServices {
   gameManager: GameManager;
   cooldown: CooldownManager;
   registry: GameRegistry;
+  playerRepository: PlayerRepository;
+  gameRepository: GameRepository;
 }
 
 export function createGameServices(): GameServices {
@@ -35,9 +37,14 @@ export function createGameServices(): GameServices {
   registry.register(demoGame);
   registry.register(createTttGame(playerRepository, gameRepository));
 
-  gameManager.recoverActiveGames();
+  return { gameManager, cooldown, registry, playerRepository, gameRepository };
+}
 
-  return { gameManager, cooldown, registry };
+export function setupGameServices(
+  services: GameServices,
+  broadcasterId: number
+): void {
+  services.gameManager.recoverActiveGames(broadcasterId);
 }
 
 export { GameManager } from "./engine/gameManager.js";

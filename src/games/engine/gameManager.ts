@@ -32,10 +32,16 @@ export class GameManager {
     this.sendChat = sendChat;
   }
 
-  recoverActiveGames(): void {
+  recoverActiveGames(defaultBroadcasterId?: number): void {
     const activeRecords = this.gameRepository.findAllActive();
 
     for (const record of activeRecords) {
+      if (record.game_type !== "ttt") {
+        logger.info(
+          `Partida recuperada (${record.game_type}): ${record.id} — use !${record.game_type} end para encerrar`
+        );
+      }
+
       const playerX = this.playerRepository.findById(record.player_x_id);
       const playerO = this.playerRepository.findById(record.player_o_id);
 
@@ -49,7 +55,9 @@ export class GameManager {
         ? (JSON.parse(record.board_state) as Record<string, unknown>)
         : {};
       const broadcasterId =
-        typeof state.broadcasterId === "number" ? state.broadcasterId : 0;
+        typeof state.broadcasterId === "number" && state.broadcasterId > 0
+          ? state.broadcasterId
+          : (defaultBroadcasterId ?? 0);
 
       const session: ActiveGameSession = {
         id: record.id,
@@ -67,7 +75,9 @@ export class GameManager {
 
       this.sessions.set(record.channel_slug, session);
       this.scheduleTimeout(session);
-      logger.info(`Partida recuperada: ${record.id} (${record.game_type})`);
+      logger.info(
+        `Partida recuperada: ${record.id} (${record.game_type}) — ${session.playerX.username} vs ${playerO.username}`
+      );
     }
   }
 

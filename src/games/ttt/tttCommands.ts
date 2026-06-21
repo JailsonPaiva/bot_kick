@@ -27,7 +27,13 @@ import {
   renderWaiting,
   renderWin,
   TTT_HELP,
+  TTT_HELP_FULL,
 } from "./tttRenderer.js";
+import {
+  applyTttStats,
+  registerPlayer,
+  registerSessionPlayers,
+} from "./tttService.js";
 
 function sender(ctx: GameHandlerContext) {
   return {
@@ -61,27 +67,11 @@ async function requireTttSession(
   return session;
 }
 
-function applyStats(
+function ensurePlayerRegistered(
   playerRepository: PlayerRepository,
-  session: ActiveGameSession,
-  outcome: "x_win" | "o_win" | "draw"
+  ctx: GameHandlerContext
 ): void {
-  if (!session.playerO) return;
-
-  if (outcome === "draw") {
-    playerRepository.updateStats(session.playerX.dbId, "draw");
-    playerRepository.updateStats(session.playerO.dbId, "draw");
-    return;
-  }
-
-  if (outcome === "x_win") {
-    playerRepository.updateStats(session.playerX.dbId, "win");
-    playerRepository.updateStats(session.playerO.dbId, "loss");
-    return;
-  }
-
-  playerRepository.updateStats(session.playerX.dbId, "loss");
-  playerRepository.updateStats(session.playerO.dbId, "win");
+  registerPlayer(playerRepository, sender(ctx));
 }
 
 export function createTttGame(
@@ -122,6 +112,8 @@ export function createTttGame(
           serializeTttState(freshState)
         );
 
+        registerSessionPlayers(playerRepository, session);
+
         await sendChat(
           command.broadcasterId,
           renderGameStart(
@@ -150,6 +142,8 @@ export function createTttGame(
       playerX: player,
       initialState,
     });
+
+    ensurePlayerRegistered(playerRepository, ctx);
 
     await sendChat(
       command.broadcasterId,
@@ -241,13 +235,17 @@ export function createTttGame(
     }
 
     if (result.status === "draw") {
-      applyStats(playerRepository, session, "draw");
+      const stats = applyTttStats(playerRepository, session, "draw");
       await gameManager.endGame({
         channelSlug: command.channelSlug,
         reason: "finished",
         winnerDbId: null,
         boardState: serializeTttState(result.state),
-        announceMessage: renderDraw(result.state.board),
+        announceMessage: renderDraw(
+          result.state.board,
+          stats.playerX,
+          stats.playerO
+        ),
       });
       logger.info(`[TTT] Empate — partida ${session.id}`);
       return;
@@ -265,7 +263,7 @@ export function createTttGame(
       session.playerO.dbId
     );
 
-    applyStats(
+    const stats = applyTttStats(
       playerRepository,
       session,
       winnerSymbol === "X" ? "x_win" : "o_win"
@@ -276,7 +274,11 @@ export function createTttGame(
       reason: "finished",
       winnerDbId,
       boardState: serializeTttState(result.state),
-      announceMessage: renderWin(winnerName, result.state.board),
+      announceMessage: renderWin(
+        winnerName,
+        result.state.board,
+        stats.winner
+      ),
     });
     logger.info(`[TTT] ${winnerName} venceu — partida ${session.id}`);
   }
@@ -375,7 +377,7 @@ export function createTttGame(
       session.playerO.dbId
     );
 
-    applyStats(
+    const stats = applyTttStats(
       playerRepository,
       session,
       winnerSymbol === "X" ? "x_win" : "o_win"
@@ -388,9 +390,13 @@ export function createTttGame(
       reason: "finished",
       winnerDbId,
       boardState: state ? serializeTttState(state) : session.state,
-      announceMessage: renderForfeit(winnerName, loserName),
+      announceMessage: renderForfeit(winnerName, loserName, stats.winner),
     });
     logger.info(`[TTT] ${loserName} desistiu — vitória de ${winnerName}`);
+  }
+
+  async function handleHelp(ctx: GameHandlerContext): Promise<void> {
+    await ctx.sendChat(ctx.command.broadcasterId, TTT_HELP_FULL);
   }
 
   async function handleHelpOrStatus(ctx: GameHandlerContext): Promise<void> {
@@ -463,7 +469,7 @@ export function createTttGame(
           );
           return;
         }
-        await handleHelpOrStatus(ctx);
+        await handleHelp(ctx);
         return;
       }
 

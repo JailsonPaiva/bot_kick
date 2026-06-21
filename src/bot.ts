@@ -9,7 +9,7 @@ import { WsListener, resolveChatroomId } from "./chat/wsListener.js";
 import type { ChatMessage } from "./chat/types.js";
 import { createCommandRouter } from "./commands/index.js";
 import { initDatabase, closeDatabase } from "./db/index.js";
-import { createGameServices } from "./games/index.js";
+import { createGameServices, setupGameServices } from "./games/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 
@@ -29,7 +29,9 @@ async function main(): Promise<void> {
     getAuthenticatedBroadcasterId(),
   ]);
 
-  const { gameManager, registry } = createGameServices();
+  const services = createGameServices();
+  setupGameServices(services, broadcasterId);
+  const { gameManager, registry } = services;
   const router = createCommandRouter(registry);
   const listener = new WsListener(chatroomId);
 
