@@ -362,13 +362,31 @@ VITE_API_URL=https://api.seudominio.com
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
-4. Environment Variable:
+4. **Environment Variable** (Settings → Environment Variables → Production):
 
 ```bash
-VITE_API_URL=https://api.seudominio.com
+VITE_API_URL=https://sua-api-publica.com
 ```
 
+> **Crítico:** `VITE_API_URL` é compilada no build. O arquivo `web/.env` local **não** é usado pela Vercel. Sem essa variável, o frontend tenta `http://localhost:3001` e falha em produção.
+
 5. Deploy
+
+6. O arquivo `web/vercel.json` já inclui rewrites para SPA — necessário para rotas como `/play`, `/games` e `/login` funcionarem ao abrir o link direto (ex: `!ttt web`).
+
+#### Vercel + bot local (Cloudflare Tunnel)
+
+Quando o bot roda no seu PC e a API é exposta via tunnel:
+
+| Onde | Variável | Valor |
+|---|---|---|
+| Vercel (build) | `VITE_API_URL` | URL HTTPS do tunnel (ex: `https://xxx.trycloudflare.com`) |
+| Bot (`.env`) | `CORS_ORIGIN` | URL do frontend Vercel (ex: `https://bot-kick.vercel.app`) |
+| Bot (`.env`) | `WEB_PLAY_URL` | `https://bot-kick.vercel.app/play` |
+
+Após alterar `VITE_API_URL` na Vercel, **refaça o deploy** (Redeploy). Após alterar o `.env` do bot, **reinicie** (`npm start` ou `pm2 restart`).
+
+> URLs `*.trycloudflare.com` mudam a cada execução do tunnel. Atualize `VITE_API_URL` na Vercel e redeploy sempre que reiniciar o tunnel, ou use um [Named Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/) com URL fixa.
 
 ### Após o deploy do frontend
 
@@ -483,6 +501,25 @@ curl https://sua-api.com/api/status \
 ---
 
 ## Troubleshooting
+
+### Erro 404 ao abrir link do `!ttt web` (Vercel)
+
+O frontend **não acessa o banco SQLite diretamente**. O fluxo é:
+
+```
+Navegador (Vercel)  →  API do bot (tunnel/VM)  →  SQLite + partida em memória
+     /play?token=         GET /api/play/session
+```
+
+Um **404 da Vercel** (página em branco ou "NOT_FOUND") ocorre quando a rota `/play` não é redirecionada para `index.html`. Solução: confirme que `web/vercel.json` existe no repositório e faça redeploy.
+
+Um **erro na página** ("Sessão expirada ou partida encerrada") indica que o React carregou, mas a API falhou. Verifique:
+
+1. `VITE_API_URL` configurada na Vercel (não só no `web/.env` local)
+2. Tunnel/API acessível: `curl https://sua-api/api/health`
+3. Bot rodando (`npm start`) com tunnel ativo
+4. `CORS_ORIGIN` no bot = URL exata da Vercel
+5. Token não expirou (padrão: 10 min) — use `!ttt web` de novo
 
 ### Dashboard não carrega dados / erro de CORS
 
