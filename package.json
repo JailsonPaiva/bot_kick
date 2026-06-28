@@ -10,7 +10,7 @@
     "build": "tsc",
     "build:web": "cd web && npm run build",
     "start": "node dist/bot.js",
-    "test": "tsx --test src/games/ttt/tttGame.test.ts src/commands/parser.test.ts src/commands/customCommands.test.ts src/moderation/moderationService.test.ts src/timers/timerService.test.ts src/api/routes/phase2Routes.test.ts",
+    "test": "tsx --test src/games/ttt/tttGame.test.ts src/commands/parser.test.ts src/commands/customCommands.test.ts src/moderation/moderationService.test.ts src/timers/timerService.test.ts src/api/routes/phase2Routes.test.ts src/api/openapi/spec.test.ts",
     "db:up": "docker compose up -d postgres redis",
     "db:down": "docker compose down",
     "prisma:generate": "prisma generate",
@@ -20,7 +20,15 @@
   "engines": {
     "node": ">=20"
   },
-  "keywords": ["kick", "bot", "oauth", "chat", "minigames", "api", "dashboard"],
+  "keywords": [
+    "kick",
+    "bot",
+    "oauth",
+    "chat",
+    "minigames",
+    "api",
+    "dashboard"
+  ],
   "license": "MIT",
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -35,6 +43,7 @@
     "open": "^10.1.0",
     "pg": "^8.16.0",
     "socket.io": "^4.7.5",
+    "swagger-ui-express": "^5.0.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -44,6 +53,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.11.14",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/ws": "^8.5.13",
     "prisma": "^7.8.0",
     "tsx": "^4.19.2",

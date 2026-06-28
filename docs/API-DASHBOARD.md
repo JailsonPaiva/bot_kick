@@ -6,6 +6,19 @@ O bot agora possui uma API REST completa e um dashboard web para administração
 
 ## API REST
 
+### Documentação Swagger (OpenAPI 3.0)
+
+Com o bot rodando, acesse a documentação interativa:
+
+| URL | Descrição |
+|-----|-----------|
+| `http://localhost:3001/api/docs` | Swagger UI — testar endpoints no navegador |
+| `http://localhost:3001/api/docs/openapi.json` | Spec OpenAPI em JSON |
+
+No Swagger UI, faça login em **Auth → POST /api/auth/login**, copie o `token` e clique em **Authorize** (cadeado) para usar rotas protegidas.
+
+A spec inclui todos os endpoints das Fases 1–4, esquemas de request/response e eventos WebSocket (Socket.io) na descrição geral.
+
 ### Configuração
 
 Adicione as variáveis no `.env`:

@@ -23,6 +23,7 @@ import { createPollsRouter } from "./routes/polls.js";
 import { createPublicRouter } from "./routes/public.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
+import { setupSwagger } from "./swagger.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -79,10 +80,16 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createPollsRouter());
   app.use("/api", createPublicRouter());
 
+  setupSwagger(app);
+
   app.get("/", (_req, res) => {
     res.json({
       name: "Kick Bot API",
       version: "4.0.0",
+      docs: {
+        swagger: "/api/docs",
+        openapi: "/api/docs/openapi.json",
+      },
       endpoints: {
         auth: ["POST /api/auth/login"],
         status: ["GET /api/health", "GET /api/status"],
