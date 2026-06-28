@@ -107,6 +107,7 @@ export function startApiServer(services: GameServices): {
           "GET /api/loyalty/transactions",
         ],
         alerts: [
+          "GET /api/alerts/overlay-token",
           "GET /api/alerts/config",
           "PUT /api/alerts/config",
           "POST /api/alerts/test",

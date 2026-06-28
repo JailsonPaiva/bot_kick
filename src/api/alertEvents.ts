@@ -4,6 +4,7 @@
 
 import type { Server, Socket } from "socket.io";
 import { logger } from "../utils/logger.js";
+import { verifyOverlayToken } from "./overlayAuth.js";
 
 let io: Server | null = null;
 
@@ -15,8 +16,10 @@ export function initAlertEvents(server: Server): void {
   io = server;
 
   io.on("connection", (socket: Socket) => {
-    socket.on("join:alerts", (data: { channelSlug?: string }) => {
-      const channelSlug = data?.channelSlug?.trim();
+    socket.on("join:alerts", (data: { channelSlug?: string; token?: string }) => {
+      const token = data?.token?.trim();
+      const tokenPayload = token ? verifyOverlayToken(token) : null;
+      const channelSlug = tokenPayload?.channelSlug ?? data?.channelSlug?.trim();
       if (!channelSlug) return;
       const room = alertsRoom(channelSlug);
       socket.join(room);

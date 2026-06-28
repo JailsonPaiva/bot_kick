@@ -7,11 +7,30 @@ import { prisma } from "../../infra/prisma/client.js";
 import { authMiddleware } from "../auth.js";
 import type { ApiResponse } from "../types.js";
 import { broadcastAlert } from "../alertEvents.js";
+import { generateOverlayToken } from "../overlayAuth.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
 
 export function createAlertsRouter(): Router {
   const router = Router();
+
+  router.get("/alerts/overlay-token", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    if (!channelSlug) {
+      res.status(400).json({ success: false, error: "channelSlug é obrigatório" });
+      return;
+    }
+
+    const token = generateOverlayToken(channelSlug);
+    const overlayBase =
+      process.env.WEB_OVERLAY_URL ?? "http://localhost:5173/overlay";
+    const overlayUrl = `${overlayBase}/${token}`;
+
+    res.json({
+      success: true,
+      data: { token, overlayUrl, channelSlug },
+    } satisfies ApiResponse);
+  });
 
   router.get("/alerts/config", authMiddleware, async (req, res) => {
     const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;

@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
+import { useState } from 'react'
+import { fetchOverlayToken } from '../api/alertsClient'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -12,6 +14,10 @@ interface BotStatus {
 }
 
 export default function Dashboard() {
+  const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
+  const [overlayLoading, setOverlayLoading] = useState(false)
+  const [overlayError, setOverlayError] = useState<string | null>(null)
+
   const { data, isLoading } = useQuery({
     queryKey: ['status'],
     queryFn: async () => {
@@ -67,8 +73,56 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 mt-6">
+        <h2 className="text-xl font-semibold mb-4">Overlay para OBS (Fase 3)</h2>
+        <p className="text-gray-300 mb-4 text-sm">
+          Gere um link de overlay com token para usar no Browser Source do OBS.
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => void handleGenerateOverlay()}
+            disabled={overlayLoading}
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-cyan-900 rounded-md text-sm font-medium"
+          >
+            {overlayLoading ? 'Gerando...' : 'Gerar link de overlay'}
+          </button>
+          {overlayUrl && (
+            <button
+              onClick={() => void navigator.clipboard.writeText(overlayUrl)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md text-sm font-medium"
+            >
+              Copiar link
+            </button>
+          )}
+        </div>
+
+        {overlayError && (
+          <p className="text-red-400 text-sm mt-3">{overlayError}</p>
+        )}
+
+        {overlayUrl && (
+          <div className="mt-4 p-3 bg-black/40 border border-gray-700 rounded text-xs break-all text-cyan-200">
+            {overlayUrl}
+          </div>
+        )}
+      </div>
     </div>
   )
+
+  async function handleGenerateOverlay() {
+    setOverlayLoading(true)
+    setOverlayError(null)
+    try {
+      const data = await fetchOverlayToken()
+      setOverlayUrl(data.overlayUrl)
+    } catch {
+      setOverlayError('Não foi possível gerar token do overlay.')
+    } finally {
+      setOverlayLoading(false)
+    }
+  }
 }
 
 function StatCard({
