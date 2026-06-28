@@ -1,9 +1,19 @@
 export type PollStatus = 'open' | 'closed'
 
-export interface PollOption {
-  index: number
+export interface PollVoteRecord {
+  id: string
+  pollId: string
+  kickUserId: string | number
+  username: string
+  option: number
+  weight: number
+  createdAt: string
+}
+
+export interface PollResultOption {
+  option: number
   text: string
-  votes: number
+  score: number
   percentage?: number
 }
 
@@ -13,20 +23,31 @@ export interface Poll {
   question: string
   options: string[]
   status: PollStatus
-  durationSeconds: number | null
-  allowSubWeight: boolean
-  subWeight: number
-  endsAt: string | null
+  durationS: number
+  weightedSubs: boolean
+  closesAt: string | null
+  closedAt: string | null
+  winnerOption: number | null
   createdAt: string
-  updatedAt: string
-  votes?: PollOption[]
+  votes?: PollVoteRecord[]
+  results?: PollResultOption[]
   totalVotes?: number
 }
 
 export interface CreatePollPayload {
   question: string
   options: string[]
-  durationSeconds?: number
-  allowSubWeight?: boolean
-  subWeight?: number
+  durationS?: number
+  weightedSubs?: boolean
+}
+
+export interface ClosePollResult {
+  ok: boolean
+  pollId: string
+  question: string
+  winnerOption: number | null
+  winnerText: string | null
+  totalVotes: number
+  results: PollResultOption[]
+  error?: string
 }

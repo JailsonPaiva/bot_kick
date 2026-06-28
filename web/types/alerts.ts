@@ -18,8 +18,8 @@ export interface OverlayTokenResponse {
 export interface AlertConfig {
   id: string
   channelSlug: string
-  alertType: string
-  enabled: boolean
+  type: string
+  isActive: boolean
   imageUrl: string | null
   message: string | null
   durationMs: number

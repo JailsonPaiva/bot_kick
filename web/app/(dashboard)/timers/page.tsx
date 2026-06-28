@@ -18,7 +18,7 @@ import { Toggle } from '@/components/ui/Toggle'
 const emptyForm: CreateTimerPayload = {
   name: '',
   messages: [''],
-  intervalSeconds: 300,
+  intervalMinutes: 5,
 }
 
 export default function TimersPage() {
@@ -41,7 +41,7 @@ export default function TimersPage() {
     onSuccess: invalidate,
   })
   const toggleMut = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => toggleTimer(id, enabled),
+    mutationFn: (id: string) => toggleTimer(id),
     onSuccess: invalidate,
   })
   const deleteMut = useMutation({ mutationFn: deleteTimer, onSuccess: invalidate })
@@ -54,7 +54,7 @@ export default function TimersPage() {
 
   function openEdit(t: Timer) {
     setEditTarget(t)
-    setForm({ name: t.name, messages: t.messages, intervalSeconds: t.intervalSeconds })
+    setForm({ name: t.name, messages: t.messages, intervalMinutes: t.intervalMinutes })
     setModalOpen(true)
   }
 
@@ -106,14 +106,14 @@ export default function TimersPage() {
                 <div>
                   <h3 className="font-semibold text-lg">{t.name}</h3>
                   <p className="text-sm text-gray-400">
-                    A cada {Math.round(t.intervalSeconds / 60)} min ·{' '}
+                    A cada {t.intervalMinutes} min ·{' '}
                     {t.messages.length} mensagem{t.messages.length !== 1 ? 's' : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Toggle
-                    checked={t.enabled}
-                    onChange={(v) => void toggleMut.mutateAsync({ id: t.id, enabled: v })}
+                    checked={t.isActive}
+                    onChange={() => void toggleMut.mutateAsync(t.id)}
                   />
                   <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>
                     Editar
@@ -170,11 +170,11 @@ export default function TimersPage() {
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
           <Input
-            label="Intervalo (segundos)"
+            label="Intervalo (minutos)"
             type="number"
-            min={60}
-            value={form.intervalSeconds}
-            onChange={(e) => setForm((f) => ({ ...f, intervalSeconds: Number(e.target.value) }))}
+            min={1}
+            value={form.intervalMinutes}
+            onChange={(e) => setForm((f) => ({ ...f, intervalMinutes: Number(e.target.value) }))}
           />
           <div>
             <label className="text-sm font-medium text-gray-300 block mb-2">

@@ -1,25 +1,15 @@
-export interface ViewerPoints {
-  id: string
-  channelSlug: string
+export interface LoyaltyTopEntry {
   username: string
-  kickUserId: number | null
   points: number
-  totalEarned: number
-  rank?: number
+  rank: number
 }
 
 export interface PointTransaction {
   id: string
   channelSlug: string
-  username: string
+  kickUserId: string | number
   amount: number
   type: string
-  description: string | null
+  reason: string | null
   createdAt: string
-}
-
-export interface LoyaltyTopEntry {
-  username: string
-  points: number
-  rank: number
 }

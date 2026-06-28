@@ -1,28 +1,30 @@
 export interface ModerationConfig {
-  id: string
+  id?: string
   channelSlug: string
-  blockLinks: boolean
-  linkWhitelist: string[]
-  blockCaps: boolean
-  capsThreshold: number
-  blockSpam: boolean
-  spamWindowSeconds: number
-  spamMaxMessages: number
+  linksEnabled: boolean
+  linksWhitelist: string[]
+  capsEnabled: boolean
+  capsPercent: number
+  spamEnabled: boolean
+  spamWindow: number
   bannedWords: string[]
-  warnMessage: string | null
-  createdAt: string
-  updatedAt: string
+  actionType: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ModerationLog {
   id: string
   channelSlug: string
+  userId: number
   username: string
-  kickUserId: number | null
+  messageId: string
+  content: string
   reason: string
-  message: string
   action: string
   createdAt: string
 }
 
-export type UpdateModerationPayload = Partial<Omit<ModerationConfig, 'id' | 'channelSlug' | 'createdAt' | 'updatedAt'>>
+export type UpdateModerationPayload = Partial<
+  Omit<ModerationConfig, 'id' | 'channelSlug' | 'createdAt' | 'updatedAt'>
+>

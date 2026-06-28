@@ -117,7 +117,7 @@ export default function LoyaltyPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700/50">
                     <tr>
-                      {['Usuário', 'Tipo', 'Pontos', 'Descrição', 'Data'].map((h) => (
+                      {['ID usuário', 'Tipo', 'Pontos', 'Motivo', 'Data'].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                           {h}
                         </th>
@@ -127,7 +127,7 @@ export default function LoyaltyPage() {
                   <tbody className="divide-y divide-gray-700/50">
                     {txData.transactions.map((tx) => (
                       <tr key={tx.id} className="hover:bg-gray-700/20">
-                        <td className="px-4 py-3 text-sm text-cyan-300 font-medium">{tx.username}</td>
+                        <td className="px-4 py-3 text-sm text-cyan-300 font-medium">{String(tx.kickUserId)}</td>
                         <td className="px-4 py-3">
                           <Badge variant={txTypeColor(tx.type) as 'green' | 'red' | 'blue' | 'yellow' | 'gray'}>
                             {tx.type}
@@ -139,7 +139,7 @@ export default function LoyaltyPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-400 max-w-xs truncate">
-                          {tx.description ?? '—'}
+                          {tx.reason ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-400">
                           {new Date(tx.createdAt).toLocaleString('pt-BR')}

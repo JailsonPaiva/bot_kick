@@ -4,10 +4,9 @@ export interface Command {
   trigger: string
   response: string
   aliases: string[]
-  cooldownSeconds: number
-  userCooldownSeconds: number
-  permissionLevel: string
-  enabled: boolean
+  permission: string
+  cooldown: number
+  isActive: boolean
   usageCount: number
   createdAt: string
   updatedAt: string
@@ -17,9 +16,10 @@ export interface CreateCommandPayload {
   trigger: string
   response: string
   aliases?: string[]
-  cooldownSeconds?: number
-  userCooldownSeconds?: number
-  permissionLevel?: string
+  permission?: string
+  cooldown?: number
 }
 
-export type UpdateCommandPayload = Partial<CreateCommandPayload>
+export type UpdateCommandPayload = Partial<
+  CreateCommandPayload & { isActive: boolean }
+>

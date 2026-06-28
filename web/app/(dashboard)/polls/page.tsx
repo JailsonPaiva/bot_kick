@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchPolls, createPoll, fetchPollStatus, closePoll, deletePoll } from '@/lib/api/polls'
+import { fetchPolls, createPoll, fetchPollById, closePoll } from '@/lib/api/polls'
 import type { CreatePollPayload, Poll } from '@/types/polls'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -13,9 +13,8 @@ import { Toggle } from '@/components/ui/Toggle'
 const emptyForm: CreatePollPayload = {
   question: '',
   options: ['', ''],
-  durationSeconds: 300,
-  allowSubWeight: false,
-  subWeight: 2,
+  durationS: 300,
+  weightedSubs: false,
 }
 
 export default function PollsPage() {
@@ -31,7 +30,7 @@ export default function PollsPage() {
 
   const { data: activePollData } = useQuery({
     queryKey: ['poll-status', activePollId],
-    queryFn: () => fetchPollStatus(activePollId!),
+    queryFn: () => fetchPollById(activePollId!),
     enabled: !!activePollId,
     refetchInterval: 5000,
   })
@@ -46,11 +45,14 @@ export default function PollsPage() {
       setActivePollId(data.id)
     },
   })
+
   const closeMut = useMutation({
     mutationFn: closePoll,
-    onSuccess: () => { invalidate(); setActivePollId(null) },
+    onSuccess: () => {
+      invalidate()
+      setActivePollId(null)
+    },
   })
-  const deleteMut = useMutation({ mutationFn: deletePoll, onSuccess: invalidate })
 
   function addOption() {
     setForm((f) => ({ ...f, options: [...f.options, ''] }))
@@ -71,19 +73,15 @@ export default function PollsPage() {
   const openPolls = polls.filter((p) => p.status === 'open')
   const closedPolls = polls.filter((p) => p.status === 'closed')
 
-  function calcPercentage(votes: number, total: number) {
-    if (total === 0) return 0
-    return Math.round((votes / total) * 100)
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Enquetes</h1>
-        <Button onClick={() => setModalOpen(true)}>+ Nova Enquete</Button>
+        <Button onClick={() => setModalOpen(true)} disabled={openPolls.length > 0}>
+          + Nova Enquete
+        </Button>
       </div>
 
-      {/* Active poll live view */}
       {activePollId && activePollData && (
         <div className="bg-gray-800 rounded-xl border border-green-700 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -93,11 +91,7 @@ export default function PollsPage() {
               <p className="text-sm text-gray-400">{activePollData.totalVotes ?? 0} voto(s)</p>
             </div>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setActivePollId(null)}
-              >
+              <Button size="sm" variant="secondary" onClick={() => setActivePollId(null)}>
                 Fechar painel
               </Button>
               {activePollData.status === 'open' && (
@@ -105,7 +99,7 @@ export default function PollsPage() {
                   size="sm"
                   variant="danger"
                   loading={closeMut.isPending}
-                  onClick={() => void closeMut.mutateAsync(activePollData.id)}
+                  onClick={() => void closeMut.mutateAsync()}
                 >
                   Encerrar enquete
                 </Button>
@@ -113,18 +107,18 @@ export default function PollsPage() {
             </div>
           </div>
           <div className="space-y-3">
-            {activePollData.votes?.map((opt) => (
-              <div key={opt.index}>
+            {(activePollData.results ?? []).map((opt) => (
+              <div key={opt.option}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-200">{opt.index + 1}. {opt.text}</span>
+                  <span className="text-gray-200">{opt.option}. {opt.text}</span>
                   <span className="text-gray-400 font-medium">
-                    {opt.votes} voto(s) · {calcPercentage(opt.votes, activePollData.totalVotes ?? 0)}%
+                    {opt.score} voto(s) · {opt.percentage ?? 0}%
                   </span>
                 </div>
                 <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                    style={{ width: `${calcPercentage(opt.votes, activePollData.totalVotes ?? 0)}%` }}
+                    style={{ width: `${opt.percentage ?? 0}%` }}
                   />
                 </div>
               </div>
@@ -144,13 +138,23 @@ export default function PollsPage() {
           {openPolls.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold mb-3 text-green-400">Em aberto</h2>
-              {openPolls.map((poll) => <PollRow key={poll.id} poll={poll} onView={() => setActivePollId(poll.id)} onClose={() => void closeMut.mutateAsync(poll.id)} onDelete={() => void deleteMut.mutateAsync(poll.id)} closingId={closeMut.isPending ? poll.id : null} deletingId={deleteMut.isPending ? poll.id : null} />)}
+              {openPolls.map((poll) => (
+                <PollRow
+                  key={poll.id}
+                  poll={poll}
+                  onView={() => setActivePollId(poll.id)}
+                  onClose={() => void closeMut.mutateAsync()}
+                  closing={closeMut.isPending}
+                />
+              ))}
             </div>
           )}
           {closedPolls.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold mb-3 text-gray-400">Encerradas</h2>
-              {closedPolls.map((poll) => <PollRow key={poll.id} poll={poll} onView={() => setActivePollId(poll.id)} onClose={() => void closeMut.mutateAsync(poll.id)} onDelete={() => void deleteMut.mutateAsync(poll.id)} closingId={null} deletingId={deleteMut.isPending ? poll.id : null} />)}
+              {closedPolls.map((poll) => (
+                <PollRow key={poll.id} poll={poll} onView={() => setActivePollId(poll.id)} />
+              ))}
             </div>
           )}
         </div>
@@ -205,29 +209,19 @@ export default function PollsPage() {
             </div>
           </div>
           <Input
-            label="Duração (segundos, 0 = ilimitado)"
+            label="Duração (segundos, mínimo 15)"
             type="number"
-            min={0}
-            value={form.durationSeconds}
-            onChange={(e) => setForm((f) => ({ ...f, durationSeconds: Number(e.target.value) }))}
+            min={15}
+            value={form.durationS}
+            onChange={(e) => setForm((f) => ({ ...f, durationS: Number(e.target.value) }))}
           />
           <div className="flex items-center justify-between p-3 bg-gray-700/40 rounded-lg">
-            <span className="text-sm text-gray-300">Peso extra para assinantes</span>
+            <span className="text-sm text-gray-300">Peso extra para assinantes (x2)</span>
             <Toggle
-              checked={!!form.allowSubWeight}
-              onChange={(v) => setForm((f) => ({ ...f, allowSubWeight: v }))}
+              checked={!!form.weightedSubs}
+              onChange={(v) => setForm((f) => ({ ...f, weightedSubs: v }))}
             />
           </div>
-          {form.allowSubWeight && (
-            <Input
-              label="Multiplicador de votos (assinantes)"
-              type="number"
-              min={1}
-              max={10}
-              value={form.subWeight}
-              onChange={(e) => setForm((f) => ({ ...f, subWeight: Number(e.target.value) }))}
-            />
-          )}
         </div>
       </Modal>
     </div>
@@ -238,19 +232,15 @@ function PollRow({
   poll,
   onView,
   onClose,
-  onDelete,
-  closingId,
-  deletingId,
+  closing = false,
 }: {
   poll: Poll
   onView: () => void
-  onClose: () => void
-  onDelete: () => void
-  closingId: string | null
-  deletingId: string | null
+  onClose?: () => void
+  closing?: boolean
 }) {
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 flex items-center justify-between">
+    <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 flex items-center justify-between mb-3">
       <div>
         <p className="font-medium">{poll.question}</p>
         <p className="text-sm text-gray-400">
@@ -264,24 +254,11 @@ function PollRow({
       </div>
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={onView}>Ver resultados</Button>
-        {poll.status === 'open' && (
-          <Button
-            size="sm"
-            variant="danger"
-            loading={closingId === poll.id}
-            onClick={onClose}
-          >
+        {poll.status === 'open' && onClose && (
+          <Button size="sm" variant="danger" loading={closing} onClick={onClose}>
             Encerrar
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          loading={deletingId === poll.id}
-          onClick={onDelete}
-        >
-          Excluir
-        </Button>
       </div>
     </div>
   )

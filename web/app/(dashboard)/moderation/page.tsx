@@ -79,8 +79,8 @@ export default function ModerationPage() {
         <div className="space-y-6">
           <Section title="Filtro de Links">
             <Toggle
-              checked={!!field('blockLinks')}
-              onChange={(v) => setField('blockLinks', v)}
+              checked={!!field('linksEnabled')}
+              onChange={(v) => setField('linksEnabled', v)}
               label="Bloquear links"
             />
             <div className="mt-3">
@@ -89,16 +89,16 @@ export default function ModerationPage() {
                 rows={3}
                 className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="kick.com&#10;youtube.com"
-                value={(field('linkWhitelist') as string[] | undefined ?? []).join('\n')}
-                onChange={(e) => setField('linkWhitelist', e.target.value.split('\n').map((s) => s.trim()).filter(Boolean))}
+                value={(field('linksWhitelist') as string[] | undefined ?? []).join('\n')}
+                onChange={(e) => setField('linksWhitelist', e.target.value.split('\n').map((s) => s.trim()).filter(Boolean))}
               />
             </div>
           </Section>
 
           <Section title="Filtro de Caps">
             <Toggle
-              checked={!!field('blockCaps')}
-              onChange={(v) => setField('blockCaps', v)}
+              checked={!!field('capsEnabled')}
+              onChange={(v) => setField('capsEnabled', v)}
               label="Bloquear excesso de maiúsculas"
             />
             <div className="mt-3">
@@ -107,32 +107,25 @@ export default function ModerationPage() {
                 type="number"
                 min={0}
                 max={100}
-                value={field('capsThreshold') as number | undefined ?? 70}
-                onChange={(e) => setField('capsThreshold', Number(e.target.value))}
+                value={field('capsPercent') as number | undefined ?? 70}
+                onChange={(e) => setField('capsPercent', Number(e.target.value))}
               />
             </div>
           </Section>
 
           <Section title="Filtro de Spam">
             <Toggle
-              checked={!!field('blockSpam')}
-              onChange={(v) => setField('blockSpam', v)}
+              checked={!!field('spamEnabled')}
+              onChange={(v) => setField('spamEnabled', v)}
               label="Bloquear spam"
             />
-            <div className="mt-3 grid grid-cols-2 gap-4">
+            <div className="mt-3">
               <Input
                 label="Janela (s)"
                 type="number"
                 min={1}
-                value={field('spamWindowSeconds') as number | undefined ?? 10}
-                onChange={(e) => setField('spamWindowSeconds', Number(e.target.value))}
-              />
-              <Input
-                label="Máx. mensagens"
-                type="number"
-                min={1}
-                value={field('spamMaxMessages') as number | undefined ?? 5}
-                onChange={(e) => setField('spamMaxMessages', Number(e.target.value))}
+                value={field('spamWindow') as number | undefined ?? 5}
+                onChange={(e) => setField('spamWindow', Number(e.target.value))}
               />
             </div>
           </Section>
@@ -147,12 +140,19 @@ export default function ModerationPage() {
             />
           </Section>
 
-          <Section title="Mensagem de Aviso">
-            <Input
-              placeholder="Ex: @{user}, esse conteúdo não é permitido aqui."
-              value={field('warnMessage') as string | undefined ?? ''}
-              onChange={(e) => setField('warnMessage', e.target.value)}
-            />
+          <Section title="Tipo de ação">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-300">Ação ao detectar violação</label>
+              <select
+                className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={field('actionType') as string | undefined ?? 'warn'}
+                onChange={(e) => setField('actionType', e.target.value)}
+              >
+                <option value="warn">Avisar</option>
+                <option value="delete">Deletar</option>
+                <option value="timeout">Timeout</option>
+              </select>
+            </div>
           </Section>
 
           <div className="flex items-center gap-3">
@@ -193,7 +193,7 @@ export default function ModerationPage() {
                       <tr key={log.id} className="hover:bg-gray-700/20">
                         <td className="px-4 py-3 text-sm font-medium text-cyan-300">{log.username}</td>
                         <td className="px-4 py-3"><Badge variant="yellow">{log.reason}</Badge></td>
-                        <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate">{log.message}</td>
+                        <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate">{log.content}</td>
                         <td className="px-4 py-3"><Badge variant="red">{log.action}</Badge></td>
                         <td className="px-4 py-3 text-sm text-gray-400">
                           {new Date(log.createdAt).toLocaleString('pt-BR')}

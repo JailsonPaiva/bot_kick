@@ -3,8 +3,9 @@ export interface Timer {
   channelSlug: string
   name: string
   messages: string[]
-  intervalSeconds: number
-  enabled: boolean
+  intervalMinutes: number
+  minViewers: number
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -12,7 +13,8 @@ export interface Timer {
 export interface CreateTimerPayload {
   name: string
   messages: string[]
-  intervalSeconds: number
+  intervalMinutes: number
+  minViewers?: number
 }
 
-export type UpdateTimerPayload = Partial<CreateTimerPayload>
+export type UpdateTimerPayload = Partial<CreateTimerPayload & { isActive: boolean }>

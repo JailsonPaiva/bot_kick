@@ -22,9 +22,8 @@ const emptyForm: CreateCommandPayload = {
   trigger: '',
   response: '',
   aliases: [],
-  cooldownSeconds: 30,
-  userCooldownSeconds: 60,
-  permissionLevel: 'everyone',
+  cooldown: 30,
+  permission: 'everyone',
 }
 
 export default function CommandsPage() {
@@ -48,7 +47,7 @@ export default function CommandsPage() {
     onSuccess: invalidate,
   })
   const toggleMut = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => toggleCommand(id, enabled),
+    mutationFn: (id: string) => toggleCommand(id),
     onSuccess: invalidate,
   })
   const deleteMut = useMutation({ mutationFn: deleteCommand, onSuccess: invalidate })
@@ -66,9 +65,8 @@ export default function CommandsPage() {
       trigger: cmd.trigger,
       response: cmd.response,
       aliases: cmd.aliases,
-      cooldownSeconds: cmd.cooldownSeconds,
-      userCooldownSeconds: cmd.userCooldownSeconds,
-      permissionLevel: cmd.permissionLevel,
+      cooldown: cmd.cooldown,
+      permission: cmd.permission,
     })
     setAliasesRaw(cmd.aliases.join(', '))
     setModalOpen(true)
@@ -115,16 +113,16 @@ export default function CommandsPage() {
                   <td className="px-4 py-3 text-sm font-mono text-cyan-300">!{cmd.trigger}</td>
                   <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate">{cmd.response}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={cmd.permissionLevel === 'everyone' ? 'gray' : 'blue'}>
-                      {cmd.permissionLevel}
+                    <Badge variant={cmd.permission === 'everyone' ? 'gray' : 'blue'}>
+                      {cmd.permission}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-400">{cmd.cooldownSeconds}s</td>
+                  <td className="px-4 py-3 text-sm text-gray-400">{cmd.cooldown}s</td>
                   <td className="px-4 py-3 text-sm text-gray-400">{cmd.usageCount}</td>
                   <td className="px-4 py-3">
                     <Toggle
-                      checked={cmd.enabled}
-                      onChange={(v) => void toggleMut.mutateAsync({ id: cmd.id, enabled: v })}
+                      checked={cmd.isActive}
+                      onChange={() => void toggleMut.mutateAsync(cmd.id)}
                     />
                   </td>
                   <td className="px-4 py-3 flex gap-2">
@@ -191,26 +189,19 @@ export default function CommandsPage() {
           />
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Cooldown global (s)"
+              label="Cooldown (s)"
               type="number"
               min={0}
-              value={form.cooldownSeconds}
-              onChange={(e) => setForm((f) => ({ ...f, cooldownSeconds: Number(e.target.value) }))}
-            />
-            <Input
-              label="Cooldown por usuário (s)"
-              type="number"
-              min={0}
-              value={form.userCooldownSeconds}
-              onChange={(e) => setForm((f) => ({ ...f, userCooldownSeconds: Number(e.target.value) }))}
+              value={form.cooldown}
+              onChange={(e) => setForm((f) => ({ ...f, cooldown: Number(e.target.value) }))}
             />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-300">Permissão</label>
             <select
               className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={form.permissionLevel}
-              onChange={(e) => setForm((f) => ({ ...f, permissionLevel: e.target.value }))}
+              value={form.permission}
+              onChange={(e) => setForm((f) => ({ ...f, permission: e.target.value }))}
             >
               {PERMISSIONS.map((p) => (
                 <option key={p} value={p}>{p}</option>

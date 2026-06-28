@@ -39,15 +39,15 @@ export default function AlertsPage() {
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ alertType, payload }: { alertType: string; payload: Partial<AlertConfig> }) =>
-      updateAlertConfig(alertType, payload),
+    mutationFn: ({ type, payload }: { type: string; payload: Partial<AlertConfig> }) =>
+      updateAlertConfig(type, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert-configs'] }),
   })
 
-  async function handleTest(alertType: string) {
-    setTestingType(alertType)
+  async function handleTest(type: string) {
+    setTestingType(type)
     try {
-      await testAlert(alertType)
+      await testAlert(type)
     } finally {
       setTestingType(null)
     }
@@ -68,7 +68,7 @@ export default function AlertsPage() {
   ]
 
   function getConfig(type: string): AlertConfig | undefined {
-    return configs.find((c) => c.alertType === type)
+    return configs.find((c) => c.type === type)
   }
 
   return (
@@ -116,11 +116,11 @@ export default function AlertsPage() {
                 emoji={ALERT_EMOJIS[type] ?? '🔔'}
                 config={cfg}
                 isTesting={testingType === type}
-                onToggle={(enabled) =>
-                  void updateMut.mutateAsync({ alertType: type, payload: { enabled } })
+                onToggle={(isActive) =>
+                  void updateMut.mutateAsync({ type, payload: { isActive } })
                 }
                 onUpdate={(payload) =>
-                  void updateMut.mutateAsync({ alertType: type, payload })
+                  void updateMut.mutateAsync({ type, payload })
                 }
                 onTest={() => void handleTest(type)}
               />
@@ -156,7 +156,7 @@ function AlertCard({
   const [message, setMessage] = useState(config?.message ?? '')
   const [durationMs, setDurationMs] = useState(config?.durationMs ?? 5000)
 
-  const enabled = config?.enabled ?? false
+  const enabled = config?.isActive ?? false
 
   return (
     <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">

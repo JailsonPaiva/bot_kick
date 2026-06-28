@@ -1,29 +1,41 @@
-export type GiveawayStatus = 'pending' | 'open' | 'closed' | 'finished'
-export type GiveawayFilter = 'all' | 'subs' | 'followers'
+export type GiveawayStatus = 'open' | 'closed'
+export type GiveawayFilterType = 'everyone' | 'subscribers' | 'followers' | 'both'
+
+export interface GiveawayEntry {
+  id: string
+  giveawayId: string
+  username: string
+  kickUserId: string | number
+  slug: string
+  createdAt: string
+}
 
 export interface Giveaway {
   id: string
   channelSlug: string
   prize: string
   status: GiveawayStatus
-  filter: GiveawayFilter
-  pointsCost: number
-  winnerUsername: string | null
+  filterType: GiveawayFilterType
+  costPoints: number
+  winnerKickUserId: string | number | null
+  winnerUsername?: string | null
   entryCount?: number
+  entries?: GiveawayEntry[]
   createdAt: string
-  updatedAt: string
-}
-
-export interface GiveawayEntry {
-  id: string
-  giveawayId: string
-  username: string
-  kickUserId: number | null
-  createdAt: string
+  closedAt: string | null
 }
 
 export interface CreateGiveawayPayload {
   prize: string
-  filter?: GiveawayFilter
-  pointsCost?: number
+  filterType?: GiveawayFilterType
+  costPoints?: number
+}
+
+export interface DrawGiveawayResult {
+  ok: boolean
+  winner: { kickUserId: number; username: string } | null
+  giveawayId: string
+  entries: number
+  prize: string
+  error?: string
 }
