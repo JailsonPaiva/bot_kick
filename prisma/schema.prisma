@@ -6,6 +6,8 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Modelos de canal e sessão (Fase 1 — multi-channel futuro) ───────────────
+
 model Channel {
   id                  String       @id @default(uuid())
   kickChannelId       String       @unique
@@ -18,7 +20,6 @@ model Channel {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   sessions            BotSession[]
-  commands            Command[]
 }
 
 model User {
@@ -42,23 +43,73 @@ model BotSession {
   @@index([channelId, status])
 }
 
-model Command {
-  id         String   @id @default(uuid())
-  channelId  String
-  trigger    String
-  aliases    String[]
-  response   String
-  permission String   @default("everyone")
-  cooldown   Int      @default(5)
-  usageCount Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+// ─── Fase 2 — Comandos customizáveis ─────────────────────────────────────────
 
-  @@unique([channelId, trigger])
-  @@index([channelId, isActive])
+model Command {
+  id          String   @id @default(uuid())
+  channelSlug String
+  trigger     String
+  aliases     String[]
+  response    String
+  permission  String   @default("everyone")
+  cooldown    Int      @default(5)
+  usageCount  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channelSlug, trigger])
+  @@index([channelSlug, isActive])
 }
+
+// ─── Fase 2 — Timers ─────────────────────────────────────────────────────────
+
+model Timer {
+  id              String   @id @default(uuid())
+  channelSlug     String
+  name            String
+  messages        String[]
+  intervalMinutes Int      @default(30)
+  minViewers      Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([channelSlug, isActive])
+}
+
+// ─── Fase 2 — Moderação ───────────────────────────────────────────────────────
+
+model ModerationConfig {
+  id             String   @id @default(uuid())
+  channelSlug    String   @unique
+  linksEnabled   Boolean  @default(false)
+  linksWhitelist String[]
+  capsEnabled    Boolean  @default(false)
+  capsPercent    Int      @default(70)
+  spamEnabled    Boolean  @default(false)
+  spamWindow     Int      @default(5)
+  bannedWords    String[]
+  actionType     String   @default("warn")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ModerationLog {
+  id          String   @id @default(uuid())
+  channelSlug String
+  userId      Int
+  username    String
+  messageId   String
+  content     String
+  reason      String
+  action      String
+  createdAt   DateTime @default(now())
+
+  @@index([channelSlug, createdAt])
+}
+
+// ─── Fase 1/4 — Mini games ───────────────────────────────────────────────────
 
 model Player {
   id         String     @id @default(uuid())

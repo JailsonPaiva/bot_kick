@@ -1,11 +1,13 @@
 /**
  * Roteador de comandos — despacha mensagens parseadas para handlers registrados.
+ * Se nenhum handler estático bater, tenta comandos customizáveis do banco de dados.
  */
 
 import type { ChatMessage } from "../chat/types.js";
 import { logger } from "../utils/logger.js";
 import { parseCommand } from "./parser.js";
 import type { CommandContext, CommandHandler, ParsedCommand } from "./types.js";
+import { tryExecuteCustomCommand } from "./customCommands.js";
 
 export class CommandRouter {
   private handlers = new Map<string, CommandHandler>();
@@ -33,14 +35,25 @@ export class CommandRouter {
     logger.info(`[CHAT] ${message.sender.username}: ${content}`);
 
     const handler = this.handlers.get(parsed.command);
-    if (!handler) {
+    if (handler) {
+      try {
+        await handler(parsed, ctx);
+      } catch (err) {
+        logger.error(`Erro ao processar comando "${content}"`, err);
+      }
       return;
     }
 
+    // Fallback: comandos customizáveis no banco
     try {
-      await handler(parsed, ctx);
+      await tryExecuteCustomCommand(
+        parsed.command,
+        ctx.channelSlug,
+        message,
+        ctx.broadcasterId
+      );
     } catch (err) {
-      logger.error(`Erro ao processar comando "${content}"`, err);
+      logger.error(`Erro ao processar comando customizado "!${parsed.command}"`, err);
     }
   }
 }

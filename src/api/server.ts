@@ -13,6 +13,9 @@ import { createGamesRouter } from "./routes/games.js";
 import { createPlayersRouter } from "./routes/players.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createPlayRouter } from "./routes/play.js";
+import { createCommandsRouter } from "./routes/commands.js";
+import { createTimersRouter } from "./routes/timers.js";
+import { createModerationRouter } from "./routes/moderation.js";
 import { initGameEvents } from "./gameEvents.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
@@ -31,22 +34,24 @@ export function startApiServer(services: GameServices): {
     },
   });
 
-  // Middlewares
   app.use(cors({ origin: CORS_ORIGIN }));
   app.use(express.json());
 
-  // Log de requisições
   app.use((req, _res, next) => {
     logger.info(`[API] ${req.method} ${req.path}`);
     next();
   });
 
-  // Rotas
+  // Autenticação do dashboard
   app.use("/api/auth", createAuthRouter());
+
+  // Status e health
   app.use(
     "/api",
     createStatusRouter(services.gameManager, services.playerRepository)
   );
+
+  // Jogos e jogadores
   app.use(
     "/api",
     createGamesRouter(
@@ -58,31 +63,49 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createPlayersRouter(services.playerRepository));
   app.use("/api", createPlayRouter(services));
 
-  // Rota raiz
+  // Fase 2 — Comandos, Timers, Moderação
+  app.use("/api", createCommandsRouter());
+  app.use("/api", createTimersRouter());
+  app.use("/api", createModerationRouter());
+
   app.get("/", (_req, res) => {
     res.json({
       name: "Kick Bot API",
-      version: "3.0.0",
-      endpoints: [
-        "GET /api/health",
-        "GET /api/status",
-        "POST /api/auth/login",
-        "GET /api/games",
-        "DELETE /api/games/:id",
-        "GET /api/players",
-        "GET /api/players/:id",
-        "GET /api/play/session",
-        "POST /api/play/move",
-      ],
+      version: "4.0.0",
+      endpoints: {
+        auth: ["POST /api/auth/login"],
+        status: ["GET /api/health", "GET /api/status"],
+        games: ["GET /api/games", "DELETE /api/games/:id"],
+        players: ["GET /api/players", "GET /api/players/:id"],
+        play: ["GET /api/play/session", "POST /api/play/move"],
+        commands: [
+          "GET /api/commands",
+          "POST /api/commands",
+          "PUT /api/commands/:id",
+          "PATCH /api/commands/:id/toggle",
+          "DELETE /api/commands/:id",
+        ],
+        timers: [
+          "GET /api/timers",
+          "POST /api/timers",
+          "PUT /api/timers/:id",
+          "PATCH /api/timers/:id/toggle",
+          "DELETE /api/timers/:id",
+        ],
+        moderation: [
+          "GET /api/moderation",
+          "PUT /api/moderation",
+          "GET /api/moderation/logs",
+        ],
+      },
     });
   });
 
-  // WebSocket — eventos de partida em tempo real
   initGameEvents(io);
 
   server.listen(API_PORT, () => {
     logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);
-    logger.info(`[API] WebSocket ativo na mesma porta`);
+    logger.info("[API] WebSocket ativo na mesma porta");
   });
 
   return { server, io };

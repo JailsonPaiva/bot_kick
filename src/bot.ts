@@ -9,12 +9,14 @@ import { WsListener, resolveChatroomId } from "./chat/wsListener.js";
 import type { ChatMessage } from "./chat/types.js";
 import { createCommandRouter } from "./commands/index.js";
 import { createGameServices, setupGameServices } from "./games/index.js";
+import { timerService } from "./timers/timerService.js";
+import { checkModeration } from "./moderation/moderationService.js";
 import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 
 async function main(): Promise<void> {
-  logger.info("=== Kick Bot — PostgreSQL + Redis ===");
+  logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
 
   const channelSlug = requireEnv("KICK_CHANNEL_SLUG");
   const botSlug = requireEnv("KICK_BOT_SLUG");
@@ -30,6 +32,9 @@ async function main(): Promise<void> {
   const services = createGameServices();
   await setupGameServices(services, broadcasterId);
 
+  // Fase 2 — iniciar timers
+  await timerService.start(broadcasterId, channelSlug);
+
   const { server: apiServer, io } = startApiServer(services);
 
   const router = createCommandRouter(services.registry, services.playerRepository);
@@ -37,19 +42,26 @@ async function main(): Promise<void> {
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
-    void router.dispatch(msg, {
-      message: msg,
-      broadcasterId,
-      botSlug,
-      channelSlug,
-      chatroomId,
-    });
+    void (async () => {
+      // Fase 2 — moderação antes do roteamento
+      const modResult = await checkModeration(msg, channelSlug, broadcasterId);
+      if (modResult.blocked) return;
+
+      await router.dispatch(msg, {
+        message: msg,
+        broadcasterId,
+        botSlug,
+        channelSlug,
+        chatroomId,
+      });
+    })();
   });
 
   listener.on("connected", () => {
     const commands = router.getRegisteredCommands().map((c) => `!${c}`).join(" | ");
     logger.info("Bot online — aguardando mensagens no chat...");
-    logger.info(`Comandos: ${commands}`);
+    logger.info(`Comandos built-in: ${commands}`);
+    logger.info("Comandos customizáveis disponíveis via dashboard → /api/commands");
     logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt web | !ttt board | !demo start");
     logger.info("Ranking: !rank | !rank me | !rank @usuario");
   });
@@ -64,6 +76,7 @@ async function main(): Promise<void> {
     logger.info("Encerrando bot...");
     listener.disconnect();
     services.gameManager.shutdown();
+    timerService.stop();
     apiServer.close();
     io.close();
     process.exit(0);
