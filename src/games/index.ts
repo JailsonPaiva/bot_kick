@@ -40,11 +40,11 @@ export function createGameServices(): GameServices {
   return { gameManager, cooldown, registry, playerRepository, gameRepository };
 }
 
-export function setupGameServices(
+export async function setupGameServices(
   services: GameServices,
   broadcasterId: number
-): void {
-  services.gameManager.recoverActiveGames(broadcasterId);
+): Promise<void> {
+  await services.gameManager.recoverActiveGames(broadcasterId);
 }
 
 export { GameManager } from "./engine/gameManager.js";

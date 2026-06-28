@@ -27,12 +27,9 @@ export const gameConfig = {
   /** Máximo de partidas ativas por canal */
   maxActiveGames: parsePositiveInt(process.env.MAX_ACTIVE_GAMES, 1),
 
-  /** Caminho do arquivo SQLite */
-  databasePath: process.env.DATABASE_PATH ?? "data/bot.db",
-
   /** Prefixo [BOT] nas mensagens enviadas ao chat */
   botMessagePrefix: parseBoolean(process.env.BOT_MESSAGE_PREFIX, true),
 
-  /** Recuperar partidas active do SQLite ao iniciar o bot */
+  /** Recuperar partidas active do banco ao iniciar o bot */
   recoverGamesOnBoot: parseBoolean(process.env.RECOVER_GAMES_ON_BOOT, true),
 } as const;

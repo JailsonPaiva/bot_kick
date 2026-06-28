@@ -16,34 +16,34 @@ export function createGamesRouter(
 ): Router {
   const router = Router();
 
-  // Histórico de partidas (paginado)
-  router.get("/games", authMiddleware, (req, res) => {
+  router.get("/games", authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
     try {
-      // Por enquanto, pegar todos os jogos (TODO: implementar paginação no repository)
-      const allGames = gameRepository.findAllActive();
-      
-      const games: GameHistoryItem[] = allGames.map((game) => {
-        const playerX = playerRepository.findById(game.player_x_id);
-        const playerO = playerRepository.findById(game.player_o_id);
-        const winner = game.winner_id
-          ? playerRepository.findById(game.winner_id)
-          : null;
+      const allGames = await gameRepository.findAllActive();
 
-        return {
-          id: game.id,
-          gameType: game.game_type,
-          channelSlug: game.channel_slug,
-          playerXUsername: playerX?.username || "Desconhecido",
-          playerOUsername: playerO?.username || "Desconhecido",
-          winnerUsername: winner?.username || null,
-          status: game.status,
-          startedAt: game.started_at,
-          finishedAt: game.finished_at,
-        };
-      });
+      const games: GameHistoryItem[] = await Promise.all(
+        allGames.map(async (game) => {
+          const [playerX, playerO, winner] = await Promise.all([
+            playerRepository.findById(game.playerXId),
+            playerRepository.findById(game.playerOId),
+            game.winnerId ? playerRepository.findById(game.winnerId) : Promise.resolve(null),
+          ]);
+
+          return {
+            id: game.id,
+            gameType: game.gameType,
+            channelSlug: game.channelSlug,
+            playerXUsername: playerX?.username ?? "Desconhecido",
+            playerOUsername: playerO?.username ?? "Desconhecido",
+            winnerUsername: winner?.username ?? null,
+            status: game.status,
+            startedAt: game.startedAt.toISOString(),
+            finishedAt: game.finishedAt?.toISOString() ?? null,
+          };
+        })
+      );
 
       const response: ApiResponse<GameHistoryItem[]> = {
         success: true,
@@ -57,13 +57,12 @@ export function createGamesRouter(
     }
   });
 
-  // Cancelar partida ativa
   router.delete("/games/:id", authMiddleware, async (req, res) => {
     const gameId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     try {
-      const game = gameRepository.findById(gameId);
-      
+      const game = await gameRepository.findById(gameId);
+
       if (!game) {
         res.status(404).json({ success: false, error: "Partida não encontrada" });
         return;
@@ -78,7 +77,7 @@ export function createGamesRouter(
       }
 
       await gameManager.endGame({
-        channelSlug: game.channel_slug,
+        channelSlug: game.channelSlug,
         reason: "timeout",
         announceMessage: "⚠️ Partida cancelada pelo administrador.",
       });

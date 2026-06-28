@@ -12,16 +12,14 @@ export function createPlayersRouter(
 ): Router {
   const router = Router();
 
-  // Ranking completo (paginado)
-  router.get("/players", authMiddleware, (req, res) => {
+  router.get("/players", authMiddleware, async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const search = req.query.search as string | undefined;
 
     try {
-      let players = playerRepository.getTopN(1000);
+      let players = await playerRepository.getTopN(1000);
 
-      // Filtro de busca por username
       if (search) {
         const searchLower = search.toLowerCase();
         players = players.filter((p) =>
@@ -31,7 +29,7 @@ export function createPlayersRouter(
 
       const rankedPlayers: PlayerRankingItem[] = players.map((p, index) => ({
         id: p.id,
-        kickUserId: p.kick_user_id,
+        kickUserId: p.kickUserId,
         username: p.username,
         wins: p.wins,
         losses: p.losses,
@@ -67,27 +65,25 @@ export function createPlayersRouter(
     }
   });
 
-  // Buscar jogador específico
-  router.get("/players/:id", authMiddleware, (req, res) => {
+  router.get("/players/:id", authMiddleware, async (req, res) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const playerId = parseInt(id);
 
     try {
-      const player = playerRepository.findById(playerId);
+      const player = await playerRepository.findById(id);
 
       if (!player) {
         res.status(404).json({ success: false, error: "Jogador não encontrado" });
         return;
       }
 
-      const allPlayers = playerRepository.getTopN(1000);
-      const rank = allPlayers.findIndex((p) => p.id === playerId) + 1;
+      const allPlayers = await playerRepository.getTopN(1000);
+      const rank = allPlayers.findIndex((p) => p.id === id) + 1;
 
       const response: ApiResponse<PlayerRankingItem> = {
         success: true,
         data: {
           id: player.id,
-          kickUserId: player.kick_user_id,
+          kickUserId: player.kickUserId,
           username: player.username,
           wins: player.wins,
           losses: player.losses,

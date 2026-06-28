@@ -8,19 +8,16 @@ import { getAuthenticatedBroadcasterId } from "./auth/userInfo.js";
 import { WsListener, resolveChatroomId } from "./chat/wsListener.js";
 import type { ChatMessage } from "./chat/types.js";
 import { createCommandRouter } from "./commands/index.js";
-import { initDatabase, closeDatabase } from "./db/index.js";
 import { createGameServices, setupGameServices } from "./games/index.js";
 import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 
 async function main(): Promise<void> {
-  logger.info("=== Kick Bot — OAuth + Echo MVP ===");
+  logger.info("=== Kick Bot — PostgreSQL + Redis ===");
 
   const channelSlug = requireEnv("KICK_CHANNEL_SLUG");
   const botSlug = requireEnv("KICK_BOT_SLUG");
-
-  initDatabase();
 
   await ensureAuthenticated();
   logger.info("Autenticação OK");
@@ -31,13 +28,12 @@ async function main(): Promise<void> {
   ]);
 
   const services = createGameServices();
-  setupGameServices(services, broadcasterId);
-  const { gameManager, registry, playerRepository } = services;
-  const router = createCommandRouter(registry, playerRepository);
-  
-  // Iniciar API REST e WebSocket
+  await setupGameServices(services, broadcasterId);
+
   const { server: apiServer, io } = startApiServer(services);
-  
+
+  const router = createCommandRouter(services.registry, services.playerRepository);
+
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
@@ -67,10 +63,9 @@ async function main(): Promise<void> {
   const shutdown = (): void => {
     logger.info("Encerrando bot...");
     listener.disconnect();
-    gameManager.shutdown();
+    services.gameManager.shutdown();
     apiServer.close();
     io.close();
-    closeDatabase();
     process.exit(0);
   };
 
@@ -88,6 +83,5 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   logger.error("Falha fatal ao iniciar o bot", err);
-  closeDatabase();
   process.exit(1);
 });

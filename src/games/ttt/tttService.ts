@@ -12,29 +12,29 @@ export interface ChatPlayer {
   slug: string;
 }
 
-export function registerPlayer(
+export async function registerPlayer(
   playerRepository: PlayerRepository,
   player: ChatPlayer
-): PlayerRecord {
+): Promise<PlayerRecord> {
   return playerRepository.findOrCreate({
-    kick_user_id: player.kickUserId,
+    kickUserId: player.kickUserId,
     username: player.username,
     slug: player.slug,
   });
 }
 
-export function registerSessionPlayers(
+export async function registerSessionPlayers(
   playerRepository: PlayerRepository,
   session: ActiveGameSession
-): void {
-  registerPlayer(playerRepository, {
+): Promise<void> {
+  await registerPlayer(playerRepository, {
     kickUserId: session.playerX.kickUserId,
     username: session.playerX.username,
     slug: session.playerX.slug,
   });
 
   if (session.playerO) {
-    registerPlayer(playerRepository, {
+    await registerPlayer(playerRepository, {
       kickUserId: session.playerO.kickUserId,
       username: session.playerO.username,
       slug: session.playerO.slug,
@@ -49,29 +49,32 @@ export interface StatsOutcome {
   playerO?: PlayerRecord;
 }
 
-export function applyTttStats(
+export async function applyTttStats(
   playerRepository: PlayerRepository,
   session: ActiveGameSession,
   outcome: "x_win" | "o_win" | "draw"
-): StatsOutcome {
+): Promise<StatsOutcome> {
   if (!session.playerO) return {};
 
   if (outcome === "draw") {
-    return {
-      playerX: playerRepository.updateStats(session.playerX.dbId, "draw"),
-      playerO: playerRepository.updateStats(session.playerO.dbId, "draw"),
-    };
+    const [playerX, playerO] = await Promise.all([
+      playerRepository.updateStats(session.playerX.dbId, "draw"),
+      playerRepository.updateStats(session.playerO.dbId, "draw"),
+    ]);
+    return { playerX, playerO };
   }
 
   if (outcome === "x_win") {
-    return {
-      winner: playerRepository.updateStats(session.playerX.dbId, "win"),
-      loser: playerRepository.updateStats(session.playerO.dbId, "loss"),
-    };
+    const [winner, loser] = await Promise.all([
+      playerRepository.updateStats(session.playerX.dbId, "win"),
+      playerRepository.updateStats(session.playerO.dbId, "loss"),
+    ]);
+    return { winner, loser };
   }
 
-  return {
-    winner: playerRepository.updateStats(session.playerO.dbId, "win"),
-    loser: playerRepository.updateStats(session.playerX.dbId, "loss"),
-  };
+  const [winner, loser] = await Promise.all([
+    playerRepository.updateStats(session.playerO.dbId, "win"),
+    playerRepository.updateStats(session.playerX.dbId, "loss"),
+  ]);
+  return { winner, loser };
 }

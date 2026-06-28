@@ -148,9 +148,9 @@ export function usernameForSymbol(
 
 export function dbIdForSymbol(
   symbol: TttSymbol,
-  playerXDbId: number,
-  playerODbId: number | undefined
-): number | null {
+  playerXDbId: string,
+  playerODbId: string | undefined
+): string | null {
   if (symbol === "X") return playerXDbId;
   return playerODbId ?? null;
 }

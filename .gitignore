@@ -11,9 +11,12 @@ web/dist/
 .env
 web/.env
 
-# Banco de dados
+# Banco de dados local (legado SQLite)
 data/
 *.db
+
+# Prisma
+prisma/migrations/
 
 # Logs
 *.log

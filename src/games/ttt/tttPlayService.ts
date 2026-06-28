@@ -196,7 +196,7 @@ export async function executeTttMove(
   let state = parseTttState(session.state);
   if (!state) {
     const repaired = createInitialState(session.broadcasterId);
-    gameManager.updateState(channelSlug, serializeTttState(repaired));
+    await gameManager.updateState(channelSlug, serializeTttState(repaired));
     return {
       ok: false,
       error: "Tabuleiro reiniciado. Tente novamente.",
@@ -218,8 +218,8 @@ export async function executeTttMove(
     return { ok: false, error: result.error };
   }
 
-  gameManager.updateState(channelSlug, serializeTttState(result.state));
-  gameRepository.recordMove(
+  await gameManager.updateState(channelSlug, serializeTttState(result.state));
+  await gameRepository.recordMove(
     session.id,
     symbol === "X" ? session.playerX.dbId : session.playerO.dbId,
     position
@@ -239,7 +239,7 @@ export async function executeTttMove(
   }
 
   if (result.status === "draw") {
-    const stats = applyTttStats(playerRepository, session, "draw");
+    const stats = await applyTttStats(playerRepository, session, "draw");
     const announceMessage = renderDraw(
       result.state.board,
       stats.playerX,
@@ -273,7 +273,7 @@ export async function executeTttMove(
     session.playerO.dbId
   );
 
-  const stats = applyTttStats(
+  const stats = await applyTttStats(
     playerRepository,
     session,
     winnerSymbol === "X" ? "x_win" : "o_win"

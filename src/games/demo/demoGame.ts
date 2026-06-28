@@ -57,7 +57,7 @@ async function handleStart(ctx: GameHandlerContext): Promise<void> {
     return;
   }
 
-  gameManager.startGame({
+  await gameManager.startGame({
     channelSlug: command.channelSlug,
     broadcasterId: command.broadcasterId,
     gameType: "demo",
@@ -92,7 +92,7 @@ async function handleJoin(ctx: GameHandlerContext): Promise<void> {
   if (!sessionCheck) return;
 
   try {
-    const session = gameManager.joinGame({
+    const session = await gameManager.joinGame({
       channelSlug: command.channelSlug,
       playerO: player,
     });

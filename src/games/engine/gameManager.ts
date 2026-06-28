@@ -1,5 +1,5 @@
 /**
- * Orquestrador de partidas ativas — memória, persistência SQLite e timeout.
+ * Orquestrador de partidas ativas — memória, persistência PostgreSQL e timeout.
  */
 
 import { randomUUID } from "node:crypto";
@@ -33,13 +33,13 @@ export class GameManager {
     this.sendChat = sendChat;
   }
 
-  recoverActiveGames(defaultBroadcasterId?: number): void {
+  async recoverActiveGames(defaultBroadcasterId?: number): Promise<void> {
     if (!gameConfig.recoverGamesOnBoot) {
       logger.info("Recuperação de partidas desabilitada (RECOVER_GAMES_ON_BOOT=false)");
       return;
     }
 
-    const activeRecords = this.gameRepository.findAllActive();
+    const activeRecords = await this.gameRepository.findAllActive();
     if (activeRecords.length === 0) {
       logger.info("Nenhuma partida active para recuperar");
       return;
@@ -50,41 +50,39 @@ export class GameManager {
     let abandoned = 0;
 
     for (const record of activeRecords) {
-      if (seenChannels.has(record.channel_slug)) {
-        logger.warn(
-          `Partida ${record.id} cancelada por restart (duplicata no canal ${record.channel_slug})`
-        );
-        this.gameRepository.abandon(record.id);
+      if (seenChannels.has(record.channelSlug)) {
+        logger.warn(`Partida ${record.id} cancelada por restart (duplicata no canal ${record.channelSlug})`);
+        await this.gameRepository.abandon(record.id);
         abandoned++;
         continue;
       }
 
-      if (record.game_type !== "ttt") {
-        logger.warn(
-          `Partida ${record.id} cancelada por restart (tipo ${record.game_type} não recuperável)`
-        );
-        this.gameRepository.abandon(record.id);
+      if (record.gameType !== "ttt") {
+        logger.warn(`Partida ${record.id} cancelada por restart (tipo ${record.gameType} não recuperável)`);
+        await this.gameRepository.abandon(record.id);
         abandoned++;
         continue;
       }
 
-      const playerX = this.playerRepository.findById(record.player_x_id);
-      const playerO = this.playerRepository.findById(record.player_o_id);
+      const [playerX, playerO] = await Promise.all([
+        this.playerRepository.findById(record.playerXId),
+        this.playerRepository.findById(record.playerOId),
+      ]);
 
       if (!playerX || !playerO) {
         logger.warn(`Partida ${record.id} cancelada por restart (jogadores inválidos no banco)`);
-        this.gameRepository.abandon(record.id);
+        await this.gameRepository.abandon(record.id);
         abandoned++;
         continue;
       }
 
       let state: Record<string, unknown> = {};
-      if (record.board_state) {
+      if (record.boardState) {
         try {
-          state = JSON.parse(record.board_state) as Record<string, unknown>;
+          state = JSON.parse(record.boardState) as Record<string, unknown>;
         } catch {
-          logger.warn(`Partida ${record.id} cancelada por restart (board_state corrompido)`);
-          this.gameRepository.abandon(record.id);
+          logger.warn(`Partida ${record.id} cancelada por restart (boardState corrompido)`);
+          await this.gameRepository.abandon(record.id);
           abandoned++;
           continue;
         }
@@ -92,7 +90,7 @@ export class GameManager {
 
       if (!parseTttState(state)) {
         logger.warn(`Partida ${record.id} cancelada por restart (estado ttt inválido)`);
-        this.gameRepository.abandon(record.id);
+        await this.gameRepository.abandon(record.id);
         abandoned++;
         continue;
       }
@@ -104,8 +102,8 @@ export class GameManager {
 
       const session: ActiveGameSession = {
         id: record.id,
-        gameType: record.game_type,
-        channelSlug: record.channel_slug,
+        gameType: record.gameType,
+        channelSlug: record.channelSlug,
         broadcasterId,
         playerX: this.toSessionPlayer(playerX),
         playerO: this.toSessionPlayer(playerO),
@@ -116,18 +114,14 @@ export class GameManager {
         persisted: true,
       };
 
-      this.sessions.set(record.channel_slug, session);
-      seenChannels.add(record.channel_slug);
+      this.sessions.set(record.channelSlug, session);
+      seenChannels.add(record.channelSlug);
       this.scheduleTimeout(session);
       recovered++;
-      logger.info(
-        `Partida recuperada: ${record.id} (ttt) — ${session.playerX.username} vs ${playerO.username}`
-      );
+      logger.info(`Partida recuperada: ${record.id} (ttt) — ${playerX.username} vs ${playerO.username}`);
     }
 
-    logger.info(
-      `Recuperação concluída: ${recovered} partida(s) retomada(s), ${abandoned} cancelada(s)`
-    );
+    logger.info(`Recuperação concluída: ${recovered} partida(s) retomada(s), ${abandoned} cancelada(s)`);
   }
 
   getActiveSession(channelSlug: string): ActiveGameSession | null {
@@ -138,13 +132,13 @@ export class GameManager {
     return this.sessions.has(channelSlug);
   }
 
-  startGame(params: StartGameParams): ActiveGameSession {
+  async startGame(params: StartGameParams): Promise<ActiveGameSession> {
     if (this.sessions.has(params.channelSlug)) {
       throw new Error("Já existe uma partida ativa neste canal.");
     }
 
-    const playerXRecord = this.playerRepository.findOrCreate({
-      kick_user_id: params.playerX.kickUserId,
+    const playerXRecord = await this.playerRepository.findOrCreate({
+      kickUserId: params.playerX.kickUserId,
       username: params.playerX.username,
       slug: params.playerX.slug,
     });
@@ -157,7 +151,7 @@ export class GameManager {
       playerX: this.toSessionPlayer(playerXRecord),
       playerO: null,
       state: {
-        ...params.initialState,
+        ...(params.initialState ?? {}),
         broadcasterId: params.broadcasterId,
       },
       status: "waiting",
@@ -173,7 +167,7 @@ export class GameManager {
     return session;
   }
 
-  joinGame(params: JoinGameParams): ActiveGameSession {
+  async joinGame(params: JoinGameParams): Promise<ActiveGameSession> {
     const session = this.sessions.get(params.channelSlug);
     if (!session) {
       throw new Error("Nenhuma partida aguardando oponente neste canal.");
@@ -187,8 +181,8 @@ export class GameManager {
       throw new Error("Você não pode entrar na sua própria partida.");
     }
 
-    const playerORecord = this.playerRepository.findOrCreate({
-      kick_user_id: params.playerO.kickUserId,
+    const playerORecord = await this.playerRepository.findOrCreate({
+      kickUserId: params.playerO.kickUserId,
       username: params.playerO.username,
       slug: params.playerO.slug,
     });
@@ -197,13 +191,13 @@ export class GameManager {
     session.status = "active";
     session.lastActivityAt = Date.now();
 
-    this.gameRepository.create({
+    await this.gameRepository.create({
       id: session.id,
-      game_type: session.gameType,
-      channel_slug: session.channelSlug,
-      player_x_id: session.playerX.dbId,
-      player_o_id: session.playerO.dbId,
-      board_state: JSON.stringify(session.state),
+      gameType: session.gameType,
+      channelSlug: session.channelSlug,
+      playerXId: session.playerX.dbId,
+      playerOId: session.playerO.dbId,
+      boardState: JSON.stringify(session.state),
     });
 
     session.persisted = true;
@@ -216,12 +210,11 @@ export class GameManager {
   touchActivity(channelSlug: string): void {
     const session = this.sessions.get(channelSlug);
     if (!session) return;
-
     session.lastActivityAt = Date.now();
     this.resetTimeout(session);
   }
 
-  updateState(channelSlug: string, state: Record<string, unknown>): void {
+  async updateState(channelSlug: string, state: Record<string, unknown>): Promise<void> {
     const session = this.sessions.get(channelSlug);
     if (!session) return;
 
@@ -229,7 +222,7 @@ export class GameManager {
     session.lastActivityAt = Date.now();
 
     if (session.persisted) {
-      this.gameRepository.updateBoardState(session.id, JSON.stringify(state));
+      await this.gameRepository.updateBoardState(session.id, JSON.stringify(state));
     }
 
     this.resetTimeout(session);
@@ -247,13 +240,9 @@ export class GameManager {
 
     if (session.persisted) {
       if (params.reason === "finished") {
-        this.gameRepository.finish(
-          session.id,
-          params.winnerDbId ?? null,
-          boardJson
-        );
+        await this.gameRepository.finish(session.id, params.winnerDbId ?? null, boardJson);
       } else {
-        this.gameRepository.abandon(session.id, boardJson);
+        await this.gameRepository.abandon(session.id, boardJson);
       }
     }
 
@@ -274,14 +263,14 @@ export class GameManager {
   }
 
   private toSessionPlayer(player: {
-    id: number;
-    kick_user_id: number;
+    id: string;
+    kickUserId: number;
     username: string;
     slug: string;
   }): SessionPlayer {
     return {
       dbId: player.id,
-      kickUserId: player.kick_user_id,
+      kickUserId: player.kickUserId,
       username: player.username,
       slug: player.slug,
     };
@@ -289,7 +278,6 @@ export class GameManager {
 
   private scheduleTimeout(session: ActiveGameSession): void {
     this.clearTimeout(session);
-
     session.timeoutHandle = setTimeout(() => {
       void this.handleTimeout(session.channelSlug);
     }, gameConfig.gameTimeoutMs);

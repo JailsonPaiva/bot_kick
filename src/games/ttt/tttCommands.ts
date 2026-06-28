@@ -68,13 +68,6 @@ async function requireTttSession(
   return session;
 }
 
-function ensurePlayerRegistered(
-  playerRepository: PlayerRepository,
-  ctx: GameHandlerContext
-): void {
-  registerPlayer(playerRepository, sender(ctx));
-}
-
 export function createTttGame(
   playerRepository: PlayerRepository,
   gameRepository: GameRepository
@@ -102,18 +95,18 @@ export function createTttGame(
       }
 
       try {
-        const session = gameManager.joinGame({
+        const session = await gameManager.joinGame({
           channelSlug: command.channelSlug,
           playerO: player,
         });
 
         const freshState = createInitialState(command.broadcasterId);
-        gameManager.updateState(
+        await gameManager.updateState(
           command.channelSlug,
           serializeTttState(freshState)
         );
 
-        registerSessionPlayers(playerRepository, session);
+        await registerSessionPlayers(playerRepository, session);
 
         await sendChat(
           command.broadcasterId,
@@ -137,7 +130,7 @@ export function createTttGame(
       createInitialState(command.broadcasterId)
     );
 
-    gameManager.startGame({
+    await gameManager.startGame({
       channelSlug: command.channelSlug,
       broadcasterId: command.broadcasterId,
       gameType: "ttt",
@@ -145,7 +138,7 @@ export function createTttGame(
       initialState,
     });
 
-    ensurePlayerRegistered(playerRepository, ctx);
+    await registerPlayer(playerRepository, player);
 
     const waitingSession = gameManager.getActiveSession(command.channelSlug);
     if (waitingSession) {
@@ -321,7 +314,7 @@ export function createTttGame(
       session.playerO.dbId
     );
 
-    const stats = applyTttStats(
+    const stats = await applyTttStats(
       playerRepository,
       session,
       winnerSymbol === "X" ? "x_win" : "o_win"
@@ -428,7 +421,6 @@ export function createTttGame(
         return;
       }
 
-      // !ttt 5 — jogada numérica
       if (!sub && ctx.parsed.args.length === 1) {
         const position = Number.parseInt(ctx.parsed.args[0] ?? "", 10);
         if (Number.isFinite(position)) {
@@ -437,7 +429,6 @@ export function createTttGame(
         }
       }
 
-      // !ttt sem args — ajuda ou status
       if (!sub) {
         await handleHelpOrStatus(ctx);
         return;

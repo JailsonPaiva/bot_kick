@@ -1,127 +1,116 @@
 /**
- * Repository de partidas — criação, consulta e finalização de jogos.
+ * Repository de partidas — criação, consulta e finalização de jogos via Prisma/PostgreSQL.
  */
 
-import type Database from "better-sqlite3";
-import { getDatabase } from "../client.js";
+import { prisma } from "../../infra/prisma/client.js";
 import type { CreateGameInput, GameRecord, GameStatus } from "../types.js";
 
+function toRecord(g: {
+  id: string;
+  gameType: string;
+  channelSlug: string;
+  playerXId: string;
+  playerOId: string;
+  winnerId: string | null;
+  status: string;
+  boardState: string | null;
+  startedAt: Date;
+  finishedAt: Date | null;
+}): GameRecord {
+  return {
+    id: g.id,
+    gameType: g.gameType,
+    channelSlug: g.channelSlug,
+    playerXId: g.playerXId,
+    playerOId: g.playerOId,
+    winnerId: g.winnerId,
+    status: g.status as GameStatus,
+    boardState: g.boardState,
+    startedAt: g.startedAt,
+    finishedAt: g.finishedAt,
+  };
+}
+
 export class GameRepository {
-  private db: Database.Database;
-
-  constructor(database?: Database.Database) {
-    this.db = database ?? getDatabase();
+  async create(input: CreateGameInput): Promise<GameRecord> {
+    const g = await prisma.game.create({
+      data: {
+        id: input.id,
+        gameType: input.gameType,
+        channelSlug: input.channelSlug,
+        playerXId: input.playerXId,
+        playerOId: input.playerOId,
+        status: "active",
+        boardState: input.boardState ?? null,
+      },
+    });
+    return toRecord(g);
   }
 
-  create(input: CreateGameInput): GameRecord {
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `INSERT INTO games (
-           id, game_type, channel_slug, player_x_id, player_o_id,
-           status, board_state, started_at
-         ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`
-      )
-      .run(
-        input.id,
-        input.game_type,
-        input.channel_slug,
-        input.player_x_id,
-        input.player_o_id,
-        input.board_state ?? null,
-        now
-      );
-
-    return this.findById(input.id)!;
+  async findById(id: string): Promise<GameRecord | null> {
+    const g = await prisma.game.findUnique({ where: { id } });
+    return g ? toRecord(g) : null;
   }
 
-  findById(id: string): GameRecord | null {
-    const row = this.db
-      .prepare("SELECT * FROM games WHERE id = ?")
-      .get(id) as GameRecord | undefined;
-
-    return row ?? null;
+  async findActiveByChannel(channelSlug: string): Promise<GameRecord | null> {
+    const g = await prisma.game.findFirst({
+      where: { channelSlug, status: "active" },
+      orderBy: { startedAt: "desc" },
+    });
+    return g ? toRecord(g) : null;
   }
 
-  findActiveByChannel(channelSlug: string): GameRecord | null {
-    const row = this.db
-      .prepare(
-        `SELECT * FROM games
-         WHERE channel_slug = ? AND status = 'active'
-         ORDER BY started_at DESC
-         LIMIT 1`
-      )
-      .get(channelSlug) as GameRecord | undefined;
-
-    return row ?? null;
+  async findAllActive(): Promise<GameRecord[]> {
+    const games = await prisma.game.findMany({
+      where: { status: "active" },
+      orderBy: { startedAt: "asc" },
+    });
+    return games.map(toRecord);
   }
 
-  findAllActive(): GameRecord[] {
-    return this.db
-      .prepare(`SELECT * FROM games WHERE status = 'active' ORDER BY started_at ASC`)
-      .all() as GameRecord[];
+  async updateBoardState(gameId: string, boardState: string): Promise<void> {
+    await prisma.game.update({
+      where: { id: gameId },
+      data: { boardState },
+    });
   }
 
-  updateBoardState(gameId: string, boardState: string): void {
-    this.db
-      .prepare("UPDATE games SET board_state = ? WHERE id = ?")
-      .run(boardState, gameId);
-  }
-
-  finish(
+  async finish(
     gameId: string,
-    winnerId: number | null,
+    winnerId: string | null,
     boardState: string
-  ): GameRecord {
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `UPDATE games
-         SET status = 'finished',
-             winner_id = ?,
-             board_state = ?,
-             finished_at = ?
-         WHERE id = ?`
-      )
-      .run(winnerId, boardState, now, gameId);
-
-    return this.findById(gameId)!;
+  ): Promise<GameRecord> {
+    const g = await prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: "finished",
+        winnerId,
+        boardState,
+        finishedAt: new Date(),
+      },
+    });
+    return toRecord(g);
   }
 
-  abandon(gameId: string, boardState?: string): GameRecord {
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `UPDATE games
-         SET status = 'abandoned',
-             board_state = COALESCE(?, board_state),
-             finished_at = ?
-         WHERE id = ?`
-      )
-      .run(boardState ?? null, now, gameId);
-
-    return this.findById(gameId)!;
+  async abandon(gameId: string, boardState?: string): Promise<GameRecord> {
+    const g = await prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: "abandoned",
+        finishedAt: new Date(),
+        ...(boardState !== undefined ? { boardState } : {}),
+      },
+    });
+    return toRecord(g);
   }
 
-  updateStatus(gameId: string, status: GameStatus): GameRecord {
-    this.db
-      .prepare("UPDATE games SET status = ? WHERE id = ?")
-      .run(status, gameId);
-
-    return this.findById(gameId)!;
-  }
-
-  recordMove(gameId: string, playerId: number, position: number): void {
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `INSERT INTO game_moves (game_id, player_id, position, created_at)
-         VALUES (?, ?, ?, ?)`
-      )
-      .run(gameId, playerId, position, now);
+  async recordMove(
+    gameId: string,
+    playerId: string,
+    position: number
+  ): Promise<void> {
+    await prisma.gameMove.create({
+      data: { gameId, playerId, position },
+    });
   }
 }

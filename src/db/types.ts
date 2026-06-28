@@ -1,5 +1,5 @@
 /**
- * Tipos de entidades persistidas no SQLite.
+ * Tipos de entidades persistidas — mapeados do Prisma (camelCase, id UUID string).
  */
 
 export type GameStatus = "active" | "finished" | "abandoned";
@@ -7,42 +7,40 @@ export type GameStatus = "active" | "finished" | "abandoned";
 export type GameResult = "win" | "loss" | "draw";
 
 export interface PlayerRecord {
-  id: number;
-  kick_user_id: number;
+  id: string;
+  kickUserId: number;
   username: string;
   slug: string;
   wins: number;
   losses: number;
   draws: number;
   points: number;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface GameRecord {
   id: string;
-  game_type: string;
-  channel_slug: string;
-  player_x_id: number;
-  player_o_id: number;
-  winner_id: number | null;
+  gameType: string;
+  channelSlug: string;
+  playerXId: string;
+  playerOId: string;
+  winnerId: string | null;
   status: GameStatus;
-  board_state: string | null;
-  started_at: string;
-  finished_at: string | null;
+  boardState: string | null;
+  startedAt: Date;
+  finishedAt: Date | null;
 }
 
 export interface CreateGameInput {
   id: string;
-  game_type: string;
-  channel_slug: string;
-  player_x_id: number;
-  player_o_id: number;
-  board_state?: string;
+  gameType: string;
+  channelSlug: string;
+  playerXId: string;
+  playerOId: string;
+  boardState?: string;
 }
 
 export interface CreatePlayerInput {
-  kick_user_id: number;
+  kickUserId: number;
   username: string;
   slug: string;
 }

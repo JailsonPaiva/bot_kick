@@ -15,12 +15,12 @@ export function createStatusRouter(
 ): Router {
   const router = Router();
 
-  router.get("/status", (_req, res) => {
+  router.get("/status", async (_req, res) => {
     const activeGames = Array.from(
-      (gameManager as any).sessions.values()
+      (gameManager as unknown as { sessions: Map<unknown, unknown> }).sessions.values()
     ).length;
-    
-    const totalPlayers = playerRepository.getTopN(10000).length;
+
+    const players = await playerRepository.getTopN(10000);
 
     const response: ApiResponse<BotStatusResponse> = {
       success: true,
@@ -28,7 +28,7 @@ export function createStatusRouter(
         online: true,
         uptime: Date.now() - startTime,
         activeGames,
-        totalPlayers,
+        totalPlayers: players.length,
         version: "3.0.0",
       },
     };

@@ -1,9 +1,8 @@
 /**
- * Repository de jogadores — CRUD e estatísticas de ranking.
+ * Repository de jogadores — CRUD e estatísticas de ranking via Prisma/PostgreSQL.
  */
 
-import type Database from "better-sqlite3";
-import { getDatabase } from "../client.js";
+import { prisma } from "../../infra/prisma/client.js";
 import type { CreatePlayerInput, GameResult, PlayerRecord } from "../types.js";
 
 const POINTS: Record<GameResult, number> = {
@@ -12,110 +11,88 @@ const POINTS: Record<GameResult, number> = {
   draw: 1,
 };
 
-function mapPlayerRow(row: PlayerRecord): PlayerRecord {
-  return row;
+function toRecord(p: {
+  id: string;
+  kickUserId: bigint;
+  username: string;
+  slug: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+}): PlayerRecord {
+  return {
+    id: p.id,
+    kickUserId: Number(p.kickUserId),
+    username: p.username,
+    slug: p.slug,
+    wins: p.wins,
+    losses: p.losses,
+    draws: p.draws,
+    points: p.points,
+  };
 }
 
 export class PlayerRepository {
-  private db: Database.Database;
-
-  constructor(database?: Database.Database) {
-    this.db = database ?? getDatabase();
+  async findByKickUserId(kickUserId: number): Promise<PlayerRecord | null> {
+    const p = await prisma.player.findUnique({
+      where: { kickUserId: BigInt(kickUserId) },
+    });
+    return p ? toRecord(p) : null;
   }
 
-  findByKickUserId(kickUserId: number): PlayerRecord | null {
-    const row = this.db
-      .prepare("SELECT * FROM players WHERE kick_user_id = ?")
-      .get(kickUserId) as PlayerRecord | undefined;
-
-    return row ? mapPlayerRow(row) : null;
+  async findById(id: string): Promise<PlayerRecord | null> {
+    const p = await prisma.player.findUnique({ where: { id } });
+    return p ? toRecord(p) : null;
   }
 
-  findById(id: number): PlayerRecord | null {
-    const row = this.db
-      .prepare("SELECT * FROM players WHERE id = ?")
-      .get(id) as PlayerRecord | undefined;
-
-    return row ? mapPlayerRow(row) : null;
+  async findOrCreate(input: CreatePlayerInput): Promise<PlayerRecord> {
+    const p = await prisma.player.upsert({
+      where: { kickUserId: BigInt(input.kickUserId) },
+      update: { username: input.username, slug: input.slug },
+      create: {
+        kickUserId: BigInt(input.kickUserId),
+        username: input.username,
+        slug: input.slug,
+      },
+    });
+    return toRecord(p);
   }
 
-  findOrCreate(input: CreatePlayerInput): PlayerRecord {
-    const existing = this.findByKickUserId(input.kick_user_id);
-    if (existing) {
-      if (
-        existing.username !== input.username ||
-        existing.slug !== input.slug
-      ) {
-        const now = new Date().toISOString();
-        this.db
-          .prepare(
-            `UPDATE players
-             SET username = ?, slug = ?, updated_at = ?
-             WHERE id = ?`
-          )
-          .run(input.username, input.slug, now, existing.id);
-
-        return this.findById(existing.id)!;
-      }
-      return existing;
-    }
-
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare(
-        `INSERT INTO players (
-           kick_user_id, username, slug, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?)`
-      )
-      .run(input.kick_user_id, input.username, input.slug, now, now);
-
-    return this.findById(Number(result.lastInsertRowid))!;
-  }
-
-  updateStats(playerId: number, result: GameResult): PlayerRecord {
-    const column =
-      result === "win" ? "wins" : result === "loss" ? "losses" : "draws";
+  async updateStats(playerId: string, result: GameResult): Promise<PlayerRecord> {
     const pointsDelta = POINTS[result];
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `UPDATE players
-         SET ${column} = ${column} + 1,
-             points = points + ?,
-             updated_at = ?
-         WHERE id = ?`
-      )
-      .run(pointsDelta, now, playerId);
-
-    return this.findById(playerId)!;
+    const p = await prisma.player.update({
+      where: { id: playerId },
+      data: {
+        wins:   result === "win"  ? { increment: 1 } : undefined,
+        losses: result === "loss" ? { increment: 1 } : undefined,
+        draws:  result === "draw" ? { increment: 1 } : undefined,
+        points: { increment: pointsDelta },
+      },
+    });
+    return toRecord(p);
   }
 
-  getTopN(limit: number): PlayerRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM players
-         ORDER BY points DESC, wins DESC, id ASC
-         LIMIT ?`
-      )
-      .all(limit) as PlayerRecord[];
-
-    return rows.map(mapPlayerRow);
+  async getTopN(limit: number): Promise<PlayerRecord[]> {
+    const players = await prisma.player.findMany({
+      orderBy: [{ points: "desc" }, { wins: "desc" }, { id: "asc" }],
+      take: limit,
+    });
+    return players.map(toRecord);
   }
 
-  findByUsernameOrSlug(query: string): PlayerRecord | null {
-    const normalized = query.replace(/^@/, "").trim();
+  async findByUsernameOrSlug(query: string): Promise<PlayerRecord | null> {
+    const normalized = query.replace(/^@/, "").trim().toLowerCase();
     if (!normalized) return null;
 
-    const row = this.db
-      .prepare(
-        `SELECT * FROM players
-         WHERE LOWER(username) = LOWER(?)
-            OR LOWER(slug) = LOWER(?)
-         LIMIT 1`
-      )
-      .get(normalized, normalized) as PlayerRecord | undefined;
-
-    return row ? mapPlayerRow(row) : null;
+    const p = await prisma.player.findFirst({
+      where: {
+        OR: [
+          { username: { equals: normalized, mode: "insensitive" } },
+          { slug: { equals: normalized, mode: "insensitive" } },
+        ],
+      },
+    });
+    return p ? toRecord(p) : null;
   }
 }

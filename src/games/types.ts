@@ -12,7 +12,7 @@ export type SendChatFn = (
 ) => Promise<void>;
 
 export interface SessionPlayer {
-  dbId: number;
+  dbId: string;
   kickUserId: number;
   username: string;
   slug: string;
@@ -31,7 +31,7 @@ export interface ActiveGameSession {
   status: SessionStatus;
   lastActivityAt: number;
   timeoutHandle: ReturnType<typeof setTimeout> | null;
-  /** false enquanto aguarda oponente (ainda não gravado no SQLite) */
+  /** false enquanto aguarda oponente (ainda não gravado no banco) */
   persisted: boolean;
 }
 
@@ -75,7 +75,7 @@ export type EndGameReason = "finished" | "forfeit" | "timeout" | "cancelled";
 export interface EndGameParams {
   channelSlug: string;
   reason: EndGameReason;
-  winnerDbId?: number | null;
+  winnerDbId?: string | null;
   boardState?: Record<string, unknown>;
   announceMessage?: string;
 }

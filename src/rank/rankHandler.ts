@@ -23,7 +23,7 @@ export function createRankHandler(
     const senderUsername = message.sender.username;
 
     if (parsed.subcommand === "me") {
-      const player = playerRepository.findByKickUserId(message.sender.id);
+      const player = await playerRepository.findByKickUserId(message.sender.id);
 
       if (!player) {
         await sendMessage(
@@ -33,17 +33,14 @@ export function createRankHandler(
         return;
       }
 
-      await sendMessage(
-        broadcasterId,
-        renderPlayerProfile(player, true)
-      );
+      await sendMessage(broadcasterId, renderPlayerProfile(player, true));
       logger.info(`[RANK] Stats pessoais — ${senderUsername}`);
       return;
     }
 
     if (parsed.args.length > 0) {
       const query = parsed.args[0] ?? "";
-      const player = playerRepository.findByUsernameOrSlug(query);
+      const player = await playerRepository.findByUsernameOrSlug(query);
 
       if (!player) {
         await sendMessage(broadcasterId, renderPlayerNotFound(query));
@@ -63,7 +60,7 @@ export function createRankHandler(
       return;
     }
 
-    const top = playerRepository.getTopN(TOP_LIMIT);
+    const top = await playerRepository.getTopN(TOP_LIMIT);
     await sendMessage(broadcasterId, renderTopRanking(top, TOP_LIMIT));
     logger.info(`[RANK] Top ${TOP_LIMIT} exibido`);
   };

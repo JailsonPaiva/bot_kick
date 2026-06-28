@@ -38,7 +38,7 @@ export interface GameHistoryItem {
 }
 
 export interface PlayerRankingItem {
-  id: number;
+  id: string;
   kickUserId: number;
   username: string;
   wins: number;
