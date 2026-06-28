@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Channel {
+  id                  String      @id @default(uuid())
+  kickChannelId       String      @unique
+  slug                String      @unique
+  kickAccessTokenEnc  String
+  kickRefreshTokenEnc String?
+  tokenExpiresAt      DateTime?
+  botPrefix           String      @default("!")
+  timezone            String      @default("UTC")
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  sessions            BotSession[]
+  commands            Command[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  kickUserId  String   @unique
+  username    String
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BotSession {
+  id          String   @id @default(uuid())
+  channelId   String
+  status      String
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, status])
+}
+
+model Command {
+  id         String   @id @default(uuid())
+  channelId  String
+  trigger    String
+  aliases    String[]
+  response   String
+  permission String   @default("everyone")
+  cooldown   Int      @default(5)
+  usageCount Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, trigger])
+  @@index([channelId, isActive])
+}
+
+model Player {
+  id         String   @id @default(uuid())
+  kickUserId BigInt   @unique
+  username   String
+  slug       String
+  wins       Int      @default(0)
+  losses     Int      @default(0)
+  draws      Int      @default(0)
+  points     Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  asXGames   Game[]   @relation("GamePlayerX")
+  asOGames   Game[]   @relation("GamePlayerO")
+  wonGames   Game[]   @relation("GameWinner")
+
+  @@index([points])
+}
+
+model Game {
+  id         String    @id @default(uuid())
+  gameType   String
+  channelSlug String
+  playerXId  String
+  playerOId  String
+  winnerId   String?
+  status     String
+  boardState Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  playerX    Player    @relation("GamePlayerX", fields: [playerXId], references: [id], onDelete: Restrict)
+  playerO    Player    @relation("GamePlayerO", fields: [playerOId], references: [id], onDelete: Restrict)
+  winner     Player?   @relation("GameWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([channelSlug, status])
+  @@index([gameType, startedAt])
+}

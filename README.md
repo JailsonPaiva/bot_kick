@@ -32,6 +32,23 @@ npm run dev
 
 Na primeira execução, o bot abrirá o browser para autorização OAuth. Após aprovar, os tokens são salvos em `.tokens.json` e reutilizados nas próximas execuções.
 
+### Infra de escala (Passo 1)
+
+O projeto agora inclui base para evolução com PostgreSQL + Redis + Prisma, sem quebrar o fluxo atual.
+
+```bash
+# Subir PostgreSQL e Redis
+npm run db:up
+
+# Gerar cliente Prisma
+npm run prisma:generate
+```
+
+Variáveis necessárias no `.env`:
+
+- `DATABASE_URL=postgresql://kick_bot:kick_bot@localhost:5432/kick_bot?schema=public`
+- `REDIS_URL=redis://localhost:6379`
+
 ### Variáveis de ambiente (`.env`)
 
 | Variável | Descrição |
@@ -112,6 +129,10 @@ src/
 | `npm run build` | Compila TypeScript para `dist/` |
 | `npm start` | Executa a versão compilada |
 | `npm test` | Executa testes unitários e de integração |
+| `npm run db:up` | Sobe PostgreSQL e Redis via Docker Compose |
+| `npm run db:down` | Derruba infraestrutura local |
+| `npm run prisma:generate` | Gera Prisma Client |
+| `npm run prisma:migrate:dev` | Cria/aplica migrations Prisma em dev |
 
 ## Fase 2 — Completa ✅
 
