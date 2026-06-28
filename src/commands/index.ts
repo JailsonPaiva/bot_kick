@@ -13,6 +13,13 @@ import {
 } from "../loyalty/loyaltyHandlers.js";
 import { CommandRouter } from "./router.js";
 import { handleAuth, handleEcho, handlePing } from "./handlers/mvpHandlers.js";
+import {
+  handleGiveaway,
+  handleGiveawayEntry,
+  handleGiveawayReroll,
+  handlePoll,
+  handlePollVote,
+} from "./handlers/engagementHandlers.js";
 
 export function createCommandRouter(
   gameRegistry?: GameRegistry,
@@ -24,6 +31,11 @@ export function createCommandRouter(
   router.register("echo", handleEcho);
   router.register("ping", handlePing);
   router.register("auth", handleAuth);
+  router.register("sorteio", handleGiveaway);
+  router.register("entrar", handleGiveawayEntry);
+  router.register("reroll", handleGiveawayReroll);
+  router.register("poll", handlePoll);
+  router.register("votar", handlePollVote);
 
   if (playerRepository) {
     router.register("rank", createRankHandler(playerRepository));

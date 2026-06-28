@@ -71,6 +71,7 @@ async function main(): Promise<void> {
     logger.info(`Comandos built-in: ${commands}`);
     logger.info("Comandos customizáveis disponíveis via dashboard → /api/commands");
     logger.info("Loyalty: !pontos | !top | !dar @usuario quantidade");
+    logger.info("Fase 4: !sorteio | !entrar | !reroll | !poll | !votar");
     logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt web | !ttt board | !demo start");
     logger.info("Ranking: !rank | !rank me | !rank @usuario");
   });

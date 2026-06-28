@@ -1,0 +1,27 @@
+---
+description: Toda nova funcionalidade deve incluir testes unitários
+alwaysApply: true
+---
+
+# Regra Obrigatória: Funcionalidade Nova = Testes Unitários
+
+Sempre que criar ou alterar uma funcionalidade, implemente testes unitários cobrindo o comportamento principal e cenários de erro.
+
+## Requisitos mínimos
+
+- Não finalizar tarefa de feature sem testes unitários correspondentes.
+- Testar fluxo feliz e pelo menos 1 caso de falha/validação.
+- Testar integrações de borda via mock (DB, API externa, fila, socket, etc.).
+- Atualizar o script de teste se necessário para incluir os novos arquivos.
+- Executar testes localmente e corrigir falhas antes de concluir.
+
+## Critério de bloqueio
+
+Se uma funcionalidade nova não tiver teste unitário, a tarefa é considerada incompleta.
+
+## Exemplo
+
+- Se criar `createPoll()`, deve existir teste validando:
+  - criação com dados válidos;
+  - rejeição de opções inválidas;
+  - comportamento esperado em erro de persistência (mockado).

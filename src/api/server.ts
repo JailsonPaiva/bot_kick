@@ -18,6 +18,9 @@ import { createTimersRouter } from "./routes/timers.js";
 import { createModerationRouter } from "./routes/moderation.js";
 import { createLoyaltyRouter } from "./routes/loyalty.js";
 import { createAlertsRouter } from "./routes/alerts.js";
+import { createGiveawaysRouter } from "./routes/giveaways.js";
+import { createPollsRouter } from "./routes/polls.js";
+import { createPublicRouter } from "./routes/public.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
 
@@ -72,6 +75,9 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createModerationRouter());
   app.use("/api", createLoyaltyRouter());
   app.use("/api", createAlertsRouter());
+  app.use("/api", createGiveawaysRouter());
+  app.use("/api", createPollsRouter());
+  app.use("/api", createPublicRouter());
 
   app.get("/", (_req, res) => {
     res.json({
@@ -112,6 +118,18 @@ export function startApiServer(services: GameServices): {
           "PUT /api/alerts/config",
           "POST /api/alerts/test",
         ],
+        giveaways: [
+          "GET /api/giveaways",
+          "POST /api/giveaways",
+          "POST /api/giveaways/draw",
+          "POST /api/giveaways/reroll",
+        ],
+        polls: [
+          "GET /api/polls",
+          "POST /api/polls",
+          "POST /api/polls/end",
+        ],
+        public: ["GET /api/public/ranking/:channelSlug"],
       },
     });
   });

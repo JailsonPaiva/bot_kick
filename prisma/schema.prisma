@@ -164,6 +164,67 @@ model WatchSession {
   @@index([channelSlug, kickUserId, startedAt])
 }
 
+// ─── Fase 4 — Giveaways, polls e ranking público ────────────────────────────
+
+model Giveaway {
+  id               String          @id @default(uuid())
+  channelSlug      String
+  prize            String
+  filterType       String          @default("everyone")
+  costPoints       Int             @default(0)
+  status           String          @default("open")
+  winnerKickUserId BigInt?
+  createdAt        DateTime        @default(now())
+  closedAt         DateTime?
+  entries          GiveawayEntry[]
+
+  @@index([channelSlug, status, createdAt])
+}
+
+model GiveawayEntry {
+  id         String   @id @default(uuid())
+  giveawayId String
+  kickUserId BigInt
+  username   String
+  slug       String
+  createdAt  DateTime @default(now())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@unique([giveawayId, kickUserId])
+  @@index([giveawayId, createdAt])
+}
+
+model Poll {
+  id           String     @id @default(uuid())
+  channelSlug  String
+  question     String
+  options      String[]
+  durationS    Int        @default(60)
+  weightedSubs Boolean    @default(false)
+  status       String     @default("open")
+  winnerOption Int?
+  createdAt    DateTime   @default(now())
+  closesAt     DateTime?
+  closedAt     DateTime?
+  votes        PollVote[]
+
+  @@index([channelSlug, status, createdAt])
+}
+
+model PollVote {
+  id         String   @id @default(uuid())
+  pollId     String
+  kickUserId BigInt
+  username   String
+  option     Int
+  weight     Int      @default(1)
+  createdAt  DateTime @default(now())
+  poll       Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, kickUserId])
+  @@index([pollId, option])
+}
+
 // ─── Fase 1/4 — Mini games ───────────────────────────────────────────────────
 
 model Player {
