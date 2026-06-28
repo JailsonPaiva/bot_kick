@@ -11,6 +11,17 @@ interface ActiveTimer {
   timerId: string;
   handle: ReturnType<typeof setInterval>;
 }
+interface TimerEntity {
+  id: string;
+  intervalMinutes: number;
+  messages: string[];
+}
+interface TimerServiceDeps {
+  listActiveTimers: (channelSlug: string) => Promise<TimerEntity[]>;
+  send: (broadcasterId: number, content: string) => Promise<void>;
+  setIntervalFn: typeof setInterval;
+  clearIntervalFn: typeof clearInterval;
+}
 
 /** Índice atual de cada timer para rotação de mensagens */
 const messageIndexes = new Map<string, number>();
@@ -19,14 +30,24 @@ export class TimerService {
   private broadcasterId = 0;
   private channelSlug = "";
   private activeTimers: ActiveTimer[] = [];
+  private deps: TimerServiceDeps;
+
+  constructor(deps?: Partial<TimerServiceDeps>) {
+    this.deps = {
+      listActiveTimers: async (channelSlug) =>
+        prisma.timer.findMany({ where: { channelSlug, isActive: true } }),
+      send: sendMessage,
+      setIntervalFn: setInterval,
+      clearIntervalFn: clearInterval,
+      ...deps,
+    };
+  }
 
   async start(broadcasterId: number, channelSlug: string): Promise<void> {
     this.broadcasterId = broadcasterId;
     this.channelSlug = channelSlug;
 
-    const timers = await prisma.timer.findMany({
-      where: { channelSlug, isActive: true },
-    });
+    const timers = await this.deps.listActiveTimers(channelSlug);
 
     for (const timer of timers) {
       this.scheduleTimer(timer.id, timer.intervalMinutes, timer.messages);
@@ -44,7 +65,7 @@ export class TimerService {
 
   stop(): void {
     for (const { handle } of this.activeTimers) {
-      clearInterval(handle);
+      this.deps.clearIntervalFn(handle);
     }
     this.activeTimers = [];
     logger.info("[TIMERS] Todos os timers encerrados");
@@ -59,7 +80,7 @@ export class TimerService {
 
     const intervalMs = intervalMinutes * 60 * 1000;
 
-    const handle = setInterval(() => {
+    const handle = this.deps.setIntervalFn(() => {
       void this.fireTimer(timerId, messages);
     }, intervalMs);
 
@@ -77,7 +98,7 @@ export class TimerService {
     messageIndexes.set(timerId, nextIndex);
 
     try {
-      await sendMessage(this.broadcasterId, message ?? "");
+      await this.deps.send(this.broadcasterId, message ?? "");
       logger.debug(`[TIMERS] Timer ${timerId} disparado`);
     } catch (err) {
       logger.error(`[TIMERS] Erro ao disparar timer ${timerId}`, err);

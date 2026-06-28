@@ -10,7 +10,7 @@
     "build": "tsc",
     "build:web": "cd web && npm run build",
     "start": "node dist/bot.js",
-    "test": "tsx --test src/games/ttt/tttGame.test.ts src/commands/parser.test.ts",
+    "test": "tsx --test src/games/ttt/tttGame.test.ts src/commands/parser.test.ts src/commands/customCommands.test.ts src/moderation/moderationService.test.ts src/timers/timerService.test.ts src/api/routes/phase2Routes.test.ts",
     "db:up": "docker compose up -d postgres redis",
     "db:down": "docker compose down",
     "prisma:generate": "prisma generate",

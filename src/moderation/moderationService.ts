@@ -17,6 +17,26 @@ export interface ModerationResult {
   blocked: boolean;
   reason?: string;
 }
+interface ModerationConfigEntity {
+  linksEnabled: boolean;
+  linksWhitelist: string[];
+  capsEnabled: boolean;
+  capsPercent: number;
+  spamEnabled: boolean;
+  spamWindow: number;
+  bannedWords: string[];
+  actionType: string;
+}
+interface ModerationDeps {
+  getConfig: (channelSlug: string) => Promise<ModerationConfigEntity | null>;
+  logViolation: (
+    channelSlug: string,
+    msg: ChatMessage,
+    reason: string,
+    action: string
+  ) => Promise<void>;
+  send: (broadcasterId: number, content: string) => Promise<void>;
+}
 
 /** Cache do config por canal para evitar query por mensagem */
 const configCache = new Map<
@@ -51,6 +71,10 @@ async function getConfig(channelSlug: string) {
 
 export function invalidateModerationCache(channelSlug: string): void {
   configCache.delete(channelSlug);
+}
+export function __resetModerationStateForTests(): void {
+  configCache.clear();
+  recentMessages.clear();
 }
 
 function isModerator(msg: ChatMessage): boolean {
@@ -117,13 +141,19 @@ async function logViolation(
     },
   });
 }
+const defaultDeps: ModerationDeps = {
+  getConfig,
+  logViolation,
+  send: sendMessage,
+};
 
 export async function checkModeration(
   msg: ChatMessage,
   channelSlug: string,
-  broadcasterId: number
+  broadcasterId: number,
+  deps: ModerationDeps = defaultDeps
 ): Promise<ModerationResult> {
-  const config = await getConfig(channelSlug);
+  const config = await deps.getConfig(channelSlug);
   if (!config) return { blocked: false };
 
   if (isModerator(msg)) return { blocked: false };
@@ -151,10 +181,10 @@ export async function checkModeration(
     `[MOD] ${msg.sender.username} — ${reason} (ação: ${action})`
   );
 
-  void logViolation(channelSlug, msg, reason, action);
+  void deps.logViolation(channelSlug, msg, reason, action);
 
   if (action === "warn" || action === "timeout" || action === "ban") {
-    await sendMessage(
+    await deps.send(
       broadcasterId,
       `@${msg.sender.username} ⚠️ Mensagem removida: ${reason}.`
     );

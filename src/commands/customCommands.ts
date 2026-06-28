@@ -14,6 +14,19 @@ import { logger } from "../utils/logger.js";
 import type { ChatMessage } from "../chat/types.js";
 
 export type PermissionLevel = "everyone" | "subscribers" | "moderators" | "broadcaster";
+interface CommandEntity {
+  id: string;
+  response: string;
+  usageCount: number;
+  permission: string;
+  cooldown: number;
+}
+interface CommandDeps {
+  findCommand: (trigger: string, channelSlug: string) => Promise<CommandEntity | null>;
+  incrementUsage: (commandId: string) => Promise<void>;
+  send: (broadcasterId: number, response: string) => Promise<void>;
+  now: () => number;
+}
 
 const BOT_START_TIME = Date.now();
 
@@ -35,11 +48,12 @@ function formatUptime(ms: number): string {
 function substituteVariables(
   template: string,
   username: string,
-  usageCount: number
+  usageCount: number,
+  nowMs: number
 ): string {
-  const now = new Date();
+  const now = new Date(nowMs);
   const date = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()}`;
-  const uptime = formatUptime(Date.now() - BOT_START_TIME);
+  const uptime = formatUptime(nowMs - BOT_START_TIME);
 
   return template
     .replace(/\{user\}/gi, `@${username}`)
@@ -65,24 +79,54 @@ function hasPermission(msg: ChatMessage, required: PermissionLevel): boolean {
   return false;
 }
 
-function isOnCooldown(commandId: string, userId: number, cooldownSeconds: number): boolean {
+function isOnCooldown(
+  commandId: string,
+  userId: number,
+  cooldownSeconds: number,
+  nowMs: number
+): boolean {
   if (cooldownSeconds <= 0) return false;
 
-  const now = Date.now();
   const globalKey = commandId;
   const userKey = `${commandId}:${userId}`;
+  const hasGlobal = globalCooldowns.has(globalKey);
+  const hasUser = userCooldowns.has(userKey);
+  if (!hasGlobal && !hasUser) return false;
 
   const globalLast = globalCooldowns.get(globalKey) ?? 0;
   const userLast = userCooldowns.get(userKey) ?? 0;
 
-  const elapsed = Math.min(now - globalLast, now - userLast);
+  const elapsed = Math.min(nowMs - globalLast, nowMs - userLast);
   return elapsed < cooldownSeconds * 1000;
 }
 
-function setCooldown(commandId: string, userId: number): void {
-  const now = Date.now();
-  globalCooldowns.set(commandId, now);
-  userCooldowns.set(`${commandId}:${userId}`, now);
+function setCooldown(commandId: string, userId: number, nowMs: number): void {
+  globalCooldowns.set(commandId, nowMs);
+  userCooldowns.set(`${commandId}:${userId}`, nowMs);
+}
+
+const defaultDeps: CommandDeps = {
+  findCommand: async (trigger, channelSlug) =>
+    prisma.command.findFirst({
+      where: {
+        channelSlug,
+        isActive: true,
+        OR: [{ trigger }, { aliases: { has: trigger } }],
+      },
+    }),
+  incrementUsage: async (commandId) => {
+    await prisma.command.update({
+      where: { id: commandId },
+      data: { usageCount: { increment: 1 } },
+    });
+  },
+  send: sendMessage,
+  now: () => Date.now(),
+};
+
+export function __resetCustomCommandStateForTests(): void {
+  globalCooldowns.clear();
+  userCooldowns.clear();
 }
 
 /**
@@ -93,20 +137,12 @@ export async function tryExecuteCustomCommand(
   trigger: string,
   channelSlug: string,
   msg: ChatMessage,
-  broadcasterId: number
+  broadcasterId: number,
+  deps: CommandDeps = defaultDeps
 ): Promise<boolean> {
   const normalized = trigger.toLowerCase();
-
-  const command = await prisma.command.findFirst({
-    where: {
-      channelSlug,
-      isActive: true,
-      OR: [
-        { trigger: normalized },
-        { aliases: { has: normalized } },
-      ],
-    },
-  });
+  const nowMs = deps.now();
+  const command = await deps.findCommand(normalized, channelSlug);
 
   if (!command) return false;
 
@@ -115,7 +151,7 @@ export async function tryExecuteCustomCommand(
     return true;
   }
 
-  if (isOnCooldown(command.id, msg.sender.id, command.cooldown)) {
+  if (isOnCooldown(command.id, msg.sender.id, command.cooldown, nowMs)) {
     logger.debug(`[CMD] !${trigger} em cooldown para ${msg.sender.username}`);
     return true;
   }
@@ -123,17 +159,15 @@ export async function tryExecuteCustomCommand(
   const response = substituteVariables(
     command.response,
     msg.sender.username,
-    command.usageCount
+    command.usageCount,
+    nowMs
   );
 
-  setCooldown(command.id, msg.sender.id);
+  setCooldown(command.id, msg.sender.id, nowMs);
 
   await Promise.all([
-    sendMessage(broadcasterId, response),
-    prisma.command.update({
-      where: { id: command.id },
-      data: { usageCount: { increment: 1 } },
-    }),
+    deps.send(broadcasterId, response),
+    deps.incrementUsage(command.id),
   ]);
 
   logger.info(`[CMD] !${trigger} executado por ${msg.sender.username}`);
