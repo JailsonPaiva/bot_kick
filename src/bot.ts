@@ -11,6 +11,7 @@ import { createCommandRouter } from "./commands/index.js";
 import { createGameServices, setupGameServices } from "./games/index.js";
 import { timerService } from "./timers/timerService.js";
 import { checkModeration } from "./moderation/moderationService.js";
+import { loyaltyService } from "./loyalty/loyaltyService.js";
 import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
@@ -37,12 +38,19 @@ async function main(): Promise<void> {
 
   const { server: apiServer, io } = startApiServer(services);
 
-  const router = createCommandRouter(services.registry, services.playerRepository);
+  const router = createCommandRouter(
+    services.registry,
+    services.playerRepository,
+    loyaltyService
+  );
 
   const listener = new WsListener(chatroomId);
 
   listener.on("message", (msg: ChatMessage) => {
     void (async () => {
+      // Fase 3 — pontos por atividade no chat (janela configurável)
+      await loyaltyService.trackChatActivity(channelSlug, msg);
+
       // Fase 2 — moderação antes do roteamento
       const modResult = await checkModeration(msg, channelSlug, broadcasterId);
       if (modResult.blocked) return;
@@ -62,6 +70,7 @@ async function main(): Promise<void> {
     logger.info("Bot online — aguardando mensagens no chat...");
     logger.info(`Comandos built-in: ${commands}`);
     logger.info("Comandos customizáveis disponíveis via dashboard → /api/commands");
+    logger.info("Loyalty: !pontos | !top | !dar @usuario quantidade");
     logger.info("Mini games: !ttt join | !ttt 1-9 | !ttt web | !ttt board | !demo start");
     logger.info("Ranking: !rank | !rank me | !rank @usuario");
   });

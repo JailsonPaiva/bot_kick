@@ -16,7 +16,10 @@ import { createPlayRouter } from "./routes/play.js";
 import { createCommandsRouter } from "./routes/commands.js";
 import { createTimersRouter } from "./routes/timers.js";
 import { createModerationRouter } from "./routes/moderation.js";
+import { createLoyaltyRouter } from "./routes/loyalty.js";
+import { createAlertsRouter } from "./routes/alerts.js";
 import { initGameEvents } from "./gameEvents.js";
+import { initAlertEvents } from "./alertEvents.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -67,6 +70,8 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createCommandsRouter());
   app.use("/api", createTimersRouter());
   app.use("/api", createModerationRouter());
+  app.use("/api", createLoyaltyRouter());
+  app.use("/api", createAlertsRouter());
 
   app.get("/", (_req, res) => {
     res.json({
@@ -97,11 +102,21 @@ export function startApiServer(services: GameServices): {
           "PUT /api/moderation",
           "GET /api/moderation/logs",
         ],
+        loyalty: [
+          "GET /api/loyalty/top",
+          "GET /api/loyalty/transactions",
+        ],
+        alerts: [
+          "GET /api/alerts/config",
+          "PUT /api/alerts/config",
+          "POST /api/alerts/test",
+        ],
       },
     });
   });
 
   initGameEvents(io);
+  initAlertEvents(io);
 
   server.listen(API_PORT, () => {
     logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);

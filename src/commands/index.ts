@@ -5,12 +5,19 @@
 import type { PlayerRepository } from "../db/repositories/playerRepository.js";
 import type { GameRegistry } from "../games/registry.js";
 import { createRankHandler } from "../rank/rankHandler.js";
+import type { LoyaltyService } from "../loyalty/loyaltyService.js";
+import {
+  createPointsHandler,
+  createTopHandler,
+  createTransferHandler,
+} from "../loyalty/loyaltyHandlers.js";
 import { CommandRouter } from "./router.js";
 import { handleAuth, handleEcho, handlePing } from "./handlers/mvpHandlers.js";
 
 export function createCommandRouter(
   gameRegistry?: GameRegistry,
-  playerRepository?: PlayerRepository
+  playerRepository?: PlayerRepository,
+  loyalty?: LoyaltyService
 ): CommandRouter {
   const router = new CommandRouter();
 
@@ -20,6 +27,11 @@ export function createCommandRouter(
 
   if (playerRepository) {
     router.register("rank", createRankHandler(playerRepository));
+  }
+  if (loyalty) {
+    router.register("pontos", createPointsHandler(loyalty));
+    router.register("top", createTopHandler(loyalty));
+    router.register("dar", createTransferHandler(loyalty));
   }
 
   if (gameRegistry) {

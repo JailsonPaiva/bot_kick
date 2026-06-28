@@ -109,6 +109,61 @@ model ModerationLog {
   @@index([channelSlug, createdAt])
 }
 
+// ─── Fase 3 — Loyalty points e alertas ───────────────────────────────────────
+
+model ViewerPoints {
+  id         String   @id @default(uuid())
+  channelSlug String
+  kickUserId BigInt
+  username   String
+  slug       String
+  balance    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([channelSlug, kickUserId])
+  @@index([channelSlug, balance])
+}
+
+model PointTransaction {
+  id          String   @id @default(uuid())
+  channelSlug String
+  kickUserId  BigInt
+  amount      Int
+  type        String
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([channelSlug, kickUserId, createdAt])
+}
+
+model AlertConfig {
+  id          String   @id @default(uuid())
+  channelSlug String
+  type        String
+  isActive    Boolean  @default(true)
+  imageUrl    String?
+  message     String?
+  durationMs  Int      @default(5000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channelSlug, type])
+}
+
+model WatchSession {
+  id           String    @id @default(uuid())
+  channelSlug  String
+  kickUserId   BigInt
+  username     String
+  startedAt    DateTime
+  endedAt      DateTime?
+  pointsEarned Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  @@index([channelSlug, kickUserId, startedAt])
+}
+
 // ─── Fase 1/4 — Mini games ───────────────────────────────────────────────────
 
 model Player {
