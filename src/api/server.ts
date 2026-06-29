@@ -21,6 +21,7 @@ import { createAlertsRouter } from "./routes/alerts.js";
 import { createGiveawaysRouter } from "./routes/giveaways.js";
 import { createPollsRouter } from "./routes/polls.js";
 import { createPublicRouter } from "./routes/public.js";
+import { createKickWebhooksRouter } from "./routes/kickWebhooks.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
 import { setupSwagger } from "./swagger.js";
@@ -40,6 +41,13 @@ export function startApiServer(services: GameServices): {
       methods: ["GET", "POST"],
     },
   });
+
+  // Webhook Kick — body raw obrigatório (antes de express.json)
+  app.use(
+    "/api/kick/webhooks",
+    express.raw({ type: "application/json", limit: "1mb" }),
+    createKickWebhooksRouter()
+  );
 
   app.use(cors({ origin: CORS_ORIGIN }));
   app.use(express.json());
@@ -137,6 +145,7 @@ export function startApiServer(services: GameServices): {
           "POST /api/polls/end",
         ],
         public: ["GET /api/public/ranking/:channelSlug"],
+        kickWebhooks: ["POST /api/kick/webhooks/events"],
       },
     });
   });
