@@ -47,9 +47,13 @@ export function parseKickWebhookPayload(rawBody: Buffer): KickWebhookPayload | n
 }
 
 function handleChatMessageSent(payload: KickChatMessageSentPayload): void {
-  logger.info(
-    `[WEBHOOK] chat.message.sent id=${payload.message_id} user=${payload.sender?.username ?? "?"} content="${(payload.content ?? "").slice(0, 120)}"`
-  );
+  const sender = payload.sender?.username ?? "?";
+  const content = (payload.content ?? "").slice(0, 200);
+
+  logger.info("[WEBHOOK] chat.message.sent");
+  logger.info(`  message_id: ${payload.message_id}`);
+  logger.info(`  sender: ${sender}`);
+  logger.info(`  content: "${content}"`);
 }
 
 export function handleKickWebhookEvent(

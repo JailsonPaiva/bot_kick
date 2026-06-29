@@ -68,6 +68,8 @@ Este guia implementa **leitura oficial via webhook**. O bot pode continuar usand
 | OAuth scopes (código) | `events:subscribe` em `src/auth/oauthScopes.ts` — **relogin manual**     |
 | Webhook handler       | `POST /api/kick/webhooks/events` (Parte 3)                               |
 | Reautenticação OAuth  | `npm run auth:relogin` (Parte 4)                                         |
+| Inscrição webhook chat | `npm run kick:subscribe-chat` (Parte 5)                                  |
+| Teste E2E webhook      | `npm run kick:webhook-check` (Parte 6)                                   |
 | Leitura de chat (bot) | `src/chat/wsListener.ts` (Pusher)                                        |
 | Envio de mensagem     | `src/chat/chatSender.ts` → `POST /public/v1/chat`                        |
 | Frontend              | Repositório separado — consome API + Socket.io                           |
@@ -383,11 +385,37 @@ Ou delete `.tokens.json` e rode `npm run dev` (OAuth abre na primeira execução
 
 ## Parte 5 — Inscrever no evento chat.message.sent
 
-### 5.1 Obter access token
+> **Status:** implementado — serviço `src/kick/eventSubscriptions.ts` + comando `npm run kick:subscribe-chat`
 
-Use o token OAuth do bot (campo `access_token` em `.tokens.json` ou via fluxo interno `getValidToken()`).
+### 5.1 Pré-requisito
 
-### 5.2 Criar inscrição
+- Parte 4 concluída (`events:subscribe` no token — `npm run auth:relogin`)
+- Webhook **On** no Developer Portal (Parte 1)
+- URL pública HTTPS configurada no portal (Parte 2) — necessária para a Kick entregar eventos na Parte 6
+
+### 5.2 Comando automatizado (recomendado)
+
+```powershell
+npm run kick:subscribe-chat
+```
+
+O script:
+
+1. Lista inscrições ativas (`GET /public/v1/events/subscriptions`)
+2. Se `chat.message.sent` v1 webhook já existir → reutiliza (`created: false`)
+3. Senão → cria via `POST` e exibe `subscription_id`
+4. Lista novamente para confirmar checkpoint
+
+Saída esperada:
+
+```
+Inscrição criada com sucesso.
+subscription_id: 01HZ8X9K2M4N6P8Q0R2S4T6V8W0Y2Z4
+Ativa na Kick: event=chat.message.sent v1 method=webhook
+Total de inscrições ativas: 1
+```
+
+### 5.3 API usada (referência manual)
 
 ```http
 POST https://api.kick.com/public/v1/events/subscriptions
@@ -404,7 +432,7 @@ Content-Type: application/json
 
 Com **User Access Token**, `broadcaster_user_id` é inferido automaticamente (conta que fez OAuth).
 
-**PowerShell:**
+**PowerShell (alternativa manual):**
 
 ```powershell
 $token = "SEU_ACCESS_TOKEN"
@@ -434,7 +462,7 @@ Resposta esperada (200):
 }
 ```
 
-### 5.3 Listar inscrições ativas
+### 5.4 Listar inscrições ativas
 
 ```http
 GET https://api.kick.com/public/v1/events/subscriptions
@@ -443,37 +471,124 @@ Authorization: Bearer SEU_ACCESS_TOKEN
 
 **Checkpoint Parte 5:**
 
-- [ ] POST retornou 200 com `subscription_id`
-- [ ] GET lista `chat.message.sent`
+- [ ] `npm run kick:subscribe-chat` termina sem erro
+- [ ] Saída inclui `subscription_id`
+- [ ] GET (via script) lista `chat.message.sent` v1 method=webhook
 
 ---
 
 ## Parte 6 — Teste end-to-end
 
-### Antes de testar
+> **Status:** checklist automatizado — `npm run kick:webhook-check` + mensagem real no chat Kick
 
-- [ ] Bot rodando (`npm run dev`)
-- [ ] Tunnel ativo → `:3001`
-- [ ] Webhook URL no portal = tunnel + `/api/kick/webhooks/events`
-- [ ] Inscrição `chat.message.sent` ativa
-- [ ] Endpoint webhook implementado (Parte 3)
+Objetivo: mensagem enviada no chat da live → Kick dispara webhook → backend loga `[WEBHOOK] chat.message.sent`.
 
-### Disparar evento
+### 6.1 Subir ambiente (3 terminais)
 
-1. Abra o chat do seu canal na Kick
-2. Envie uma mensagem de teste
-3. Verifique logs do backend
+**Terminal 1 — bot:**
+
+```powershell
+npm run dev
+```
+
+Aguarde `Autenticação OK` e API em `:3001`.
+
+**Terminal 2 — tunnel Cloudflare:**
+
+```powershell
+cloudflared tunnel --url http://localhost:3001
+```
+
+Anote a URL gerada (ex.: `https://abc123.trycloudflare.com`).
+
+**Terminal 3 — checks e testes:**
+
+Atualize `.env` se a URL do tunnel mudou:
+
+```env
+PUBLIC_API_URL=https://abc123.trycloudflare.com
+KICK_WEBHOOK_PATH=/api/kick/webhooks/events
+```
+
+No [Developer Portal](https://kick.com/settings/developer) → **Webhook URL**:
+
+```
+https://abc123.trycloudflare.com/api/kick/webhooks/events
+```
+
+> URLs `*.trycloudflare.com` mudam a cada reinício do tunnel — atualize portal + `.env` sempre.
+
+### 6.2 Checklist automatizado (pré-voo)
+
+Com bot + tunnel rodando:
+
+```powershell
+npm run kick:webhook-check
+```
+
+O script valida:
+
+| Check | O que verifica |
+| ----- | -------------- |
+| `PUBLIC_API_URL` | Variável definida no `.env` |
+| `Webhook URL (portal Kick)` | URL completa para colar no portal |
+| `Health via tunnel` | `GET /api/health` pela URL pública |
+| `Health local (bot)` | Bot respondendo em `localhost:3001` |
+| `Inscrição chat.message.sent` | Parte 5 ativa na Kick |
+| `Probe webhook` | POST de teste via tunnel (se `KICK_WEBHOOK_SKIP_VERIFY=true`) |
+| `Verificação de assinatura` | Lembrete dev vs produção |
+
+Saída esperada (todos `[OK]`):
+
+```
+[OK] PUBLIC_API_URL: https://abc123.trycloudflare.com
+[OK] Webhook URL (portal Kick): https://abc123.../api/kick/webhooks/events
+[OK] Health via tunnel: ...
+[OK] Probe webhook (tunnel → bot): POST retornou 200
+[OK] Health local (bot): ...
+[OK] Inscrição chat.message.sent: ativa — id=...
+Checklist pré-voo OK — envie uma mensagem no chat Kick...
+```
+
+### 6.3 Disparar evento real
+
+1. Abra o chat do canal (`KICK_CHANNEL_SLUG`) na Kick
+2. Envie uma mensagem de teste (ex.: `teste webhook`)
+3. Verifique o **Terminal 1** (bot)
 
 **Sucesso esperado:**
 
 ```
+[WEBHOOK] chat.message.sent v1 msgId=...
 [WEBHOOK] chat.message.sent
   message_id: ...
-  sender: usuario
-  content: "teste"
+  sender: seu_usuario
+  content: "teste webhook"
 ```
 
-**Checkpoint Parte 6:** mensagem no chat Kick → log no backend com payload completo.
+### 6.4 Assinatura RSA (produção vs dev)
+
+| Modo | `.env` | Comportamento |
+| ---- | ------ | ------------- |
+| Dev local / probe | `KICK_WEBHOOK_SKIP_VERIFY=true` | Aceita POST de teste manual; eventos reais também passam |
+| Produção | `KICK_WEBHOOK_SKIP_VERIFY=false` (ou remova) | Valida assinatura Kick via public key — obrigatório em prod |
+
+Para o teste **real** da Kick, a assinatura é válida nos dois modos. O probe automatizado só funciona com `SKIP_VERIFY=true`.
+
+### 6.5 Troubleshooting rápido
+
+| Sintoma | Causa provável | Ação |
+| ------- | -------------- | ---- |
+| Nenhum log após mensagem no chat | Webhook URL desatualizada no portal | Confira URL do tunnel atual |
+| `401 Assinatura inválida` | `SKIP_VERIFY=false` + probe manual | Normal para probe; use mensagem real ou ative skip em dev |
+| `Health via tunnel` falha | Tunnel parado ou URL errada | Reinicie `cloudflared` e atualize `.env` |
+| Bot sem log | Bot não rodando | `npm run dev` no Terminal 1 |
+
+**Checkpoint Parte 6:**
+
+- [ ] `npm run kick:webhook-check` — todos `[OK]`
+- [ ] Mensagem no chat Kick → log `[WEBHOOK] chat.message.sent` no terminal do bot
+- [ ] Log inclui `message_id`, `sender` e `content`
 
 > **Não avance para a Parte 7** até este checkpoint passar.
 
