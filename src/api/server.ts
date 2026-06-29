@@ -26,7 +26,7 @@ import { initAlertEvents } from "./alertEvents.js";
 import { setupSwagger } from "./swagger.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
 export function startApiServer(services: GameServices): {
   server: http.Server;

@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-O bot agora possui uma API REST completa e um dashboard web para administração.
+Este repositório contém o **backend** (bot Kick + API REST + WebSocket). O dashboard web é um **projeto frontend separado** que consome a API documentada abaixo.
 
 ## API REST
 
@@ -25,10 +25,18 @@ Adicione as variáveis no `.env`:
 
 ```bash
 API_PORT=3001
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:3000
 API_JWT_SECRET=sua-chave-secreta-aqui
 ADMIN_PASSWORD_HASH=
+WEB_PLAY_URL=http://localhost:3000/play
+WEB_OVERLAY_URL=http://localhost:3000/overlay
 ```
+
+| Variável | Descrição |
+|---|---|
+| `CORS_ORIGIN` | URL exata do frontend (sem barra final) |
+| `WEB_PLAY_URL` | URL base de `/play` para links `!ttt web` no chat |
+| `WEB_OVERLAY_URL` | URL base de `/overlay` para Browser Source do OBS |
 
 ### Gerar Hash de Senha
 
@@ -97,52 +105,33 @@ Query params: `?page=1&limit=50&search=username`
 **GET /api/players/:id**  
 Headers: `Authorization: Bearer <token>`
 
+Outros módulos (commands, timers, moderation, loyalty, alerts, giveaways, polls, public ranking) estão documentados no Swagger.
+
 ---
 
-## Dashboard Web
+## Frontend (projeto separado)
 
-### Setup
+O dashboard não está mais em `web/` neste repositório. Para desenvolvimento local:
+
+1. Clone/inicie o projeto frontend em outro diretório
+2. Configure a URL da API no frontend:
 
 ```bash
-cd web
-npm install
-cp .env.example .env
-```
+# Next.js
+NEXT_PUBLIC_API_URL=http://localhost:3001
 
-Edite `.env`:
-```bash
+# Vite
 VITE_API_URL=http://localhost:3001
 ```
 
-### Desenvolvimento
-
-```bash
-cd web
-npm run dev
-```
-
-Acesse: http://localhost:5173
-
-### Produção
-
-```bash
-cd web
-npm run build
-```
-
-Os arquivos estarão em `web/dist/`.
+3. Inicie o frontend (`npm run dev`) — tipicamente em `http://localhost:3000`
+4. Garanta que `CORS_ORIGIN` no backend aponta para a mesma origem
 
 ### Login
 
 Senha padrão em desenvolvimento: `admin`
 
 Em produção, configure `ADMIN_PASSWORD_HASH` no `.env` do bot.
-
-### Páginas Disponíveis
-
-- **Dashboard**: Status ao vivo do bot, uptime, partidas ativas
-- **Jogos**: Histórico de todas as partidas
-- **Ranking**: Top jogadores com pontos, vitórias, derrotas
 
 ---
 
@@ -168,44 +157,44 @@ socket.on('rank:update', (data) => {
 })
 ```
 
+### Overlay OBS (alertas)
+
+1. Gere token via `GET /api/alerts/overlay-token` (autenticado)
+2. Abra `{WEB_OVERLAY_URL}/{token}` no Browser Source do OBS
+3. O overlay conecta via `join:alerts` e recebe `alert:event`
+
 ---
 
-## Estrutura de Arquivos
+## Estrutura de Arquivos (backend)
 
 ```
 src/
 ├── api/
-│   ├── types.ts          # Tipos TypeScript
-│   ├── auth.ts           # JWT e autenticação
-│   ├── server.ts         # Servidor Express
+│   ├── types.ts
+│   ├── auth.ts
+│   ├── server.ts
+│   ├── swagger.ts
+│   ├── openapi/spec.ts
 │   └── routes/
-│       ├── auth.ts       # POST /api/auth/login
-│       ├── status.ts     # GET /api/status
-│       ├── games.ts      # GET/DELETE /api/games
-│       └── players.ts    # GET /api/players
-├── bot.ts                # Inicializa API junto com bot
-└── ...
-
-web/
-├── src/
-│   ├── pages/
-│   │   ├── Login.tsx
-│   │   ├── Dashboard.tsx
-│   │   ├── Games.tsx
-│   │   └── Ranking.tsx
-│   ├── components/
-│   │   └── Layout.tsx
-│   └── App.tsx
+│       ├── auth.ts
+│       ├── status.ts
+│       ├── games.ts
+│       ├── players.ts
+│       ├── commands.ts
+│       ├── timers.ts
+│       ├── moderation.ts
+│       ├── loyalty.ts
+│       ├── alerts.ts
+│       ├── giveaways.ts
+│       ├── polls.ts
+│       └── public.ts
+├── bot.ts
 └── ...
 ```
 
 ---
 
-## Próximos Passos (Opcionais)
+## Documentação relacionada
 
-Consulte o plano completo em `.cursor/plans/evolução_bot_kick_fase_3_*.plan.md`:
-
-- Interface web para jogadores (jogo da velha no browser)
-- Mini game Quiz/Trivia
-- Integração CS2 com RCON
-- OBS Overlays
+- [Deploy em produção](DEPLOY-PRODUCAO.md)
+- [Guia rápido](../START.md)

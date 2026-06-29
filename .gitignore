@@ -1,15 +1,12 @@
 # Dependências
 node_modules/
-web/node_modules/
 
 # Build
 dist/
-web/dist/
 
 # Tokens e dados sensíveis
 .tokens.json
 .env
-web/.env
 
 # Banco de dados local (legado SQLite)
 data/

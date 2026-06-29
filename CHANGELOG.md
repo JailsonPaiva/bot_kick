@@ -1,5 +1,19 @@
 # Changelog — Kick Bot
 
+## [4.1.0] - 2026-06-28 - Separação frontend/backend
+
+### Removido
+- Pasta `web/` deste repositório — frontend agora é projeto/repositório separado
+
+### Modificado
+- `.gitignore` — removidas entradas de `web/`
+- `.env.example` — URLs padrão apontam para frontend externo (`localhost:3000`)
+- `package.json` — removidos scripts `dev:web` e `build:web`
+- Defaults de `CORS_ORIGIN`, `WEB_PLAY_URL` e `WEB_OVERLAY_URL` atualizados para `localhost:3000`
+- Documentação atualizada: `README.md`, `START.md`, `docs/API-DASHBOARD.md`, `docs/DEPLOY-PRODUCAO.md`, `roadmap.md`
+
+---
+
 ## [3.0.0] - 2026-06-21 - Fase 3: API e Dashboard Web
 
 ### Adicionado

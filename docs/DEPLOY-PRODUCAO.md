@@ -22,19 +22,19 @@ Guia para colocar o **Kick Bot** (Fase 3) em ambiente de produção com **custo 
 
 ## Visão geral da arquitetura
 
-O projeto possui **dois componentes** que devem ser hospedados separadamente:
+O projeto possui **dois componentes** em **repositórios separados**:
 
 ```
 ┌─────────────────────────┐
-│  Frontend (estático)    │  Cloudflare Pages / Vercel / Netlify
-│  web/dist/              │  Custo: $0
+│  Frontend (separado)    │  Cloudflare Pages / Vercel / Netlify
+│  Next.js ou Vite        │  Custo: $0
 └───────────┬─────────────┘
-            │  VITE_API_URL (HTTPS)
+            │  NEXT_PUBLIC_API_URL / VITE_API_URL (HTTPS)
             ▼
 ┌─────────────────────────┐
 │  Bot + API + WebSocket  │  VM (Oracle Cloud) ou PC + Tunnel
 │  npm start → porta 3001 │  Custo: $0
-│  SQLite + .tokens.json  │
+│  PostgreSQL + Redis     │
 └───────────┬─────────────┘
             │  outbound
             ▼
@@ -45,8 +45,8 @@ O projeto possui **dois componentes** que devem ser hospedados separadamente:
 |---|---|---|
 | Bot + chat Kick | Node.js 20+, processo 24/7 | VM ou PC com tunnel |
 | API REST + Socket.io | Express, porta 3001 | Mesmo servidor do bot |
-| Banco de dados | SQLite (`data/bot.db`) | Disco persistente no servidor |
-| Dashboard + Play web | React/Vite (estático) | Cloudflare Pages ou Vercel |
+| Banco de dados | PostgreSQL (Prisma) | Disco persistente no servidor |
+| Dashboard + Play web | Next.js / React (repo separado) | Cloudflare Pages ou Vercel |
 
 ---
 
@@ -71,12 +71,11 @@ A Vercel (e similares serverless) são excelentes para o **frontend**, mas **nã
 Antes de iniciar o deploy:
 
 - [ ] Bot funcionando localmente (`npm run dev`)
-- [ ] Dashboard funcionando localmente (`cd web && npm run dev`)
+- [ ] Frontend funcionando localmente (projeto separado, apontando para a API)
 - [ ] OAuth Kick concluído (arquivo `.tokens.json` gerado)
-- [ ] Build de produção sem erros:
+- [ ] Build de produção do backend sem erros:
   ```bash
   npm run build
-  npm run build:web
   ```
 - [ ] Conta no [Kick Developer Portal](https://kick.com/settings/developer) configurada
 - [ ] Senha de admin definida (hash bcrypt — ver seção de variáveis)
@@ -89,15 +88,11 @@ Use esta fase para **validar produção hoje**, sem configurar servidor na nuvem
 
 ### 1.1 — Preparar o build de produção
 
-Na raiz do projeto:
+Na raiz do projeto **backend**:
 
 ```bash
 npm install
 npm run build
-cd web
-npm install
-npm run build
-cd ..
 ```
 
 ### 1.2 — Configurar variáveis do bot
@@ -156,9 +151,13 @@ Anote a URL gerada (ex: `https://abc123.trycloudflare.com`). Essa URL muda a cad
 
 Siga a seção [Deploy do frontend](#deploy-do-frontend-cloudflare-pages-ou-vercel) abaixo.
 
-Configure a variável de build:
+Configure a variável de build no **repositório frontend**:
 
 ```bash
+# Next.js
+NEXT_PUBLIC_API_URL=https://abc123.trycloudflare.com
+
+# Vite
 VITE_API_URL=https://abc123.trycloudflare.com
 ```
 
@@ -176,7 +175,7 @@ Reinicie o bot (`npm start`).
 ### 1.6 — Limitações desta fase
 
 - O PC precisa permanecer ligado
-- URL do tunnel muda (modo trycloudflare) — atualize `VITE_API_URL` e refaça deploy do frontend se mudar
+- URL do tunnel muda (modo trycloudflare) — atualize a URL da API no frontend e refaça deploy se mudar
 - Não é adequado para live contínua — use a Fase 2 para isso
 
 ---
@@ -300,7 +299,7 @@ api.seudominio.com {
 sudo systemctl reload caddy
 ```
 
-Atualize `VITE_API_URL=https://api.seudominio.com` no frontend.
+Atualize a URL da API no frontend (ex: `NEXT_PUBLIC_API_URL=https://api.seudominio.com`).
 
 **Sem domínio:** use Cloudflare Tunnel na VM (mesmo procedimento da Fase 1, mas com Named Tunnel para URL fixa).
 
@@ -326,26 +325,27 @@ Use Certbot para HTTPS: `sudo certbot --nginx -d api.seudominio.com`
 
 ---
 
-## Deploy do frontend (Cloudflare Pages ou Vercel)
+## Deploy do frontend (repositório separado)
 
-### Opção A — Cloudflare Pages (recomendado)
+O frontend **não está** neste repositório. Faça deploy a partir do projeto frontend (Next.js, Vite, etc.) conectado ao GitHub.
 
-1. Faça push do projeto para GitHub
+### Opção A — Cloudflare Pages
+
+1. Crie um repositório só para o frontend e faça push
 2. Acesse [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create**
-3. Conecte o repositório
-4. Configurações de build:
+3. Conecte o repositório do frontend
+4. Configurações de build (exemplo Next.js):
 
 | Campo | Valor |
 |---|---|
-| Framework preset | Vite |
-| Build command | `cd web && npm install && npm run build` |
-| Build output directory | `web/dist` |
-| Root directory | `/` (raiz do repo) |
+| Framework preset | Next.js |
+| Build command | `npm run build` |
+| Build output directory | `.next` ou conforme o framework |
 
-5. Variáveis de ambiente (Settings → Environment variables):
+5. Variáveis de ambiente:
 
 ```bash
-VITE_API_URL=https://api.seudominio.com
+NEXT_PUBLIC_API_URL=https://api.seudominio.com
 ```
 
 6. Deploy → anote a URL (ex: `https://kick-bot.pages.dev`)
@@ -353,26 +353,19 @@ VITE_API_URL=https://api.seudominio.com
 ### Opção B — Vercel
 
 1. Acesse [vercel.com](https://vercel.com) → **Add New Project**
-2. Importe o repositório
-3. Configurações:
-
-| Campo | Valor |
-|---|---|
-| Root Directory | `web` |
-| Build Command | `npm run build` |
-| Output Directory | `dist` |
-
-4. **Environment Variable** (Settings → Environment Variables → Production):
+2. Importe o **repositório do frontend** (não o backend)
+3. Configure build conforme o framework (Next.js detecta automaticamente)
+4. **Environment Variable** (Production):
 
 ```bash
-VITE_API_URL=https://sua-api-publica.com
+NEXT_PUBLIC_API_URL=https://sua-api-publica.com
 ```
 
-> **Crítico:** `VITE_API_URL` é compilada no build. O arquivo `web/.env` local **não** é usado pela Vercel. Sem essa variável, o frontend tenta `http://localhost:3001` e falha em produção.
+> **Crítico:** variáveis `NEXT_PUBLIC_*` / `VITE_*` são compiladas no build. Sem elas, o frontend tenta `http://localhost:3001` e falha em produção.
 
 5. Deploy
 
-6. O arquivo `web/vercel.json` já inclui rewrites para SPA — necessário para rotas como `/play`, `/games` e `/login` funcionarem ao abrir o link direto (ex: `!ttt web`).
+6. Para SPA/Vite, configure rewrites no `vercel.json` do **frontend** para rotas como `/play`, `/login` e `/overlay`.
 
 #### Vercel + bot local (Cloudflare Tunnel)
 
@@ -380,13 +373,14 @@ Quando o bot roda no seu PC e a API é exposta via tunnel:
 
 | Onde | Variável | Valor |
 |---|---|---|
-| Vercel (build) | `VITE_API_URL` | URL HTTPS do tunnel (ex: `https://xxx.trycloudflare.com`) |
+| Vercel (frontend) | `NEXT_PUBLIC_API_URL` | URL HTTPS do tunnel (ex: `https://xxx.trycloudflare.com`) |
 | Bot (`.env`) | `CORS_ORIGIN` | URL do frontend Vercel (ex: `https://bot-kick.vercel.app`) |
 | Bot (`.env`) | `WEB_PLAY_URL` | `https://bot-kick.vercel.app/play` |
+| Bot (`.env`) | `WEB_OVERLAY_URL` | `https://bot-kick.vercel.app/overlay` |
 
-Após alterar `VITE_API_URL` na Vercel, **refaça o deploy** (Redeploy). Após alterar o `.env` do bot, **reinicie** (`npm start` ou `pm2 restart`).
+Após alterar a URL da API no frontend, **refaça o deploy**. Após alterar o `.env` do bot, **reinicie** (`npm start` ou `pm2 restart`).
 
-> URLs `*.trycloudflare.com` mudam a cada execução do tunnel. Atualize `VITE_API_URL` na Vercel e redeploy sempre que reiniciar o tunnel, ou use um [Named Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/) com URL fixa.
+> URLs `*.trycloudflare.com` mudam a cada execução do tunnel. Atualize a URL da API no frontend e redeploy sempre que reiniciar o tunnel, ou use um [Named Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/) com URL fixa.
 
 ### Após o deploy do frontend
 
@@ -395,6 +389,7 @@ Após alterar `VITE_API_URL` na Vercel, **refaça o deploy** (Redeploy). Após a
    ```bash
    CORS_ORIGIN=https://sua-url-do-frontend
    WEB_PLAY_URL=https://sua-url-do-frontend/play
+   WEB_OVERLAY_URL=https://sua-url-do-frontend/overlay
    ```
 3. Reinicie o bot (`pm2 restart kick-bot` ou `npm start`)
 
@@ -416,16 +411,18 @@ Após alterar `VITE_API_URL` na Vercel, **refaça o deploy** (Redeploy). Após a
 | `API_JWT_SECRET` | Sim (prod) | Chave secreta forte para JWT |
 | `ADMIN_PASSWORD_HASH` | Sim (prod) | Hash bcrypt da senha admin |
 | `WEB_PLAY_URL` | Sim (prod) | URL base da página `/play` para links no chat |
-| `DATABASE_PATH` | Não | Padrão: `data/bot.db` |
+| `WEB_OVERLAY_URL` | Sim (prod) | URL base de `/overlay` para Browser Source OBS |
+| `DATABASE_URL` | Sim | PostgreSQL (Prisma) |
 | `PLAYER_TOKEN_EXPIRY` | Não | Padrão: `10m` |
 
-### Frontend (variável no painel do provedor)
+### Frontend (variáveis no painel do provedor — repo separado)
 
 | Variável | Descrição |
 |---|---|
-| `VITE_API_URL` | URL HTTPS da API (sem barra final) |
+| `NEXT_PUBLIC_API_URL` | URL HTTPS da API — Next.js (sem barra final) |
+| `VITE_API_URL` | URL HTTPS da API — Vite (sem barra final) |
 
-> **Atenção:** variáveis `VITE_*` são embutidas no build. Sempre refaça o deploy do frontend ao alterá-las.
+> **Atenção:** essas variáveis são embutidas no build. Sempre refaça o deploy do frontend ao alterá-las.
 
 ---
 
@@ -511,11 +508,11 @@ Navegador (Vercel)  →  API do bot (tunnel/VM)  →  SQLite + partida em memór
      /play?token=         GET /api/play/session
 ```
 
-Um **404 da Vercel** (página em branco ou "NOT_FOUND") ocorre quando a rota `/play` não é redirecionada para `index.html`. Solução: confirme que `web/vercel.json` existe no repositório e faça redeploy.
+Um **404 da Vercel** ocorre quando a rota `/play` não está configurada no projeto frontend. Solução: configure rewrites no `vercel.json` do **repositório frontend** e faça redeploy.
 
-Um **erro na página** ("Sessão expirada ou partida encerrada") indica que o React carregou, mas a API falhou. Verifique:
+Um **erro na página** ("Sessão expirada ou partida encerrada") indica que o frontend carregou, mas a API falhou. Verifique:
 
-1. `VITE_API_URL` configurada na Vercel (não só no `web/.env` local)
+1. `NEXT_PUBLIC_API_URL` ou `VITE_API_URL` configurada no provedor do frontend
 2. Tunnel/API acessível: `curl https://sua-api/api/health`
 3. Bot rodando (`npm start`) com tunnel ativo
 4. `CORS_ORIGIN` no bot = URL exata da Vercel
@@ -548,9 +545,9 @@ Um **erro na página** ("Sessão expirada ou partida encerrada") indica que o Re
 - Defina `WEB_PLAY_URL` com a URL pública do frontend
 - Reinicie o bot
 
-### `VITE_API_URL` não atualiza no frontend
+### URL da API não atualiza no frontend
 
-- Variáveis `VITE_*` são compiladas no build — **refaça o deploy** do frontend após alterar
+- Variáveis `NEXT_PUBLIC_*` / `VITE_*` são compiladas no build — **refaça o deploy** do frontend após alterar
 
 ### Erro ao compilar `better-sqlite3` na VM
 

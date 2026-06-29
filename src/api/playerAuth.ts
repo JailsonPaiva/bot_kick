@@ -63,7 +63,7 @@ export function playerAuthMiddleware(
 }
 
 export function buildPlayUrl(token: string): string {
-  const base = process.env.WEB_PLAY_URL || "http://localhost:5173/play";
+  const base = process.env.WEB_PLAY_URL || "http://localhost:3000/play";
   const separator = base.includes("?") ? "&" : "?";
   return `${base}${separator}token=${encodeURIComponent(token)}`;
 }

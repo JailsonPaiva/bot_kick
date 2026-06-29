@@ -15,26 +15,20 @@ As fases a seguir constroem sobre essa base para transformar o bot em uma soluç
 ## Arquitetura geral
 
 ```
-apps/
-  bot/                    ← Nest.js (API + bot engine)
-    src/
-      bot/                ← KickService, EventDispatcher
-      auth/               ← OAuth Kick, JWT, Guards
-      commands/           ← CommandsModule
-      moderation/         ← ModerationModule
-      timers/             ← TimersModule (Bull queue)
-      loyalty/            ← LoyaltyModule
-      alerts/             ← AlertsGateway (WebSocket)
-      giveaway/           ← GiveawayModule
-      polls/              ← PollsModule
-      games/              ← GamesModule (jogo da velha + futuros)
+kick-bot/                 ← este repositório (bot + API REST + WebSocket)
+  src/
+    api/                  ← Express, Swagger, Socket.io
+    bot.ts
+    commands/
+    games/
+    ...
 
-  web/                    ← Next.js (dashboard + overlays)
-    app/
-      dashboard/          ← área autenticada do streamer
-      overlay/[token]/    ← browser source para OBS (pública)
-      ranking/[canal]/    ← página pública de ranking
-      game/[id]/          ← páginas de jogo para viewers
+kick-bot-web/             ← repositório frontend separado (Next.js)
+  app/
+    dashboard/            ← área autenticada do streamer
+    overlay/[token]/      ← browser source para OBS (pública)
+    ranking/[canal]/      ← página pública de ranking
+    play/                 ← páginas de jogo para viewers
 ```
 
 **Infra de suporte:**

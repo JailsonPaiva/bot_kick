@@ -141,37 +141,34 @@ src/
 - Recovery automático de partidas
 - Testes unitários
 
-## Fase 3 — API e Dashboard Web 🚀
+## Fase 3 — API REST 🚀
 
 ### API REST
 
-O bot agora expõe uma API REST completa:
+O bot expõe uma API REST completa:
 
 - **Autenticação JWT** para dashboard admin
-- **Endpoints** de status, jogos e ranking
+- **Endpoints** de status, jogos, ranking, moderação, loyalty, alertas, sorteios e enquetes
 - **WebSocket** (Socket.io) para atualizações em tempo real
+- **Swagger** em `/api/docs`
 
 Consulte [docs/API-DASHBOARD.md](docs/API-DASHBOARD.md) para detalhes.
 
 Para deploy em produção com custo zero, veja [docs/DEPLOY-PRODUCAO.md](docs/DEPLOY-PRODUCAO.md).
 
-### Dashboard Web
+### Frontend (repositório separado)
 
-Interface administrativa para gerenciar o bot:
+O dashboard web **não faz parte deste repositório**. Ele consome a API via HTTP/WebSocket.
+
+Configure no `.env` do backend as URLs do seu frontend:
 
 ```bash
-cd web
-npm install
-npm run dev
+CORS_ORIGIN=http://localhost:3000
+WEB_PLAY_URL=http://localhost:3000/play
+WEB_OVERLAY_URL=http://localhost:3000/overlay
 ```
 
-Acesse http://localhost:5173 (senha padrão dev: `admin`)
-
-**Funcionalidades:**
-- Monitoramento ao vivo (status, uptime, partidas ativas)
-- Histórico completo de jogos
-- Ranking de jogadores
-- Cancelamento de partidas
+Contrato da API: `http://localhost:3001/api/docs` (Swagger).
 
 ### Próximos Passos
 

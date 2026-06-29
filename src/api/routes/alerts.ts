@@ -23,7 +23,7 @@ export function createAlertsRouter(): Router {
 
     const token = generateOverlayToken(channelSlug);
     const overlayBase =
-      process.env.WEB_OVERLAY_URL ?? "http://localhost:5173/overlay";
+      process.env.WEB_OVERLAY_URL ?? "http://localhost:3000/overlay";
     const overlayUrl = `${overlayBase}/${token}`;
 
     res.json({

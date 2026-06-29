@@ -1,5 +1,7 @@
 # Implementação da Fase 3 — Relatório
 
+> **Atualização (2026):** o frontend (`web/`) foi **removido deste repositório** e passou a ser um projeto separado. Este repo contém apenas bot + API. Consulte [API-DASHBOARD.md](API-DASHBOARD.md) e [START.md](../START.md) para configuração atual.
+
 ## Sumário Executivo
 
 Implementação parcial da Fase 3 conforme plano em `.cursor/plans/evolução_bot_kick_fase_3_*.plan.md`.
