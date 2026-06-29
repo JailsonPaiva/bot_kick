@@ -70,6 +70,7 @@ Este guia implementa **leitura oficial via webhook**. O bot pode continuar usand
 | Reautenticação OAuth  | `npm run auth:relogin` (Parte 4)                                         |
 | Inscrição webhook chat | `npm run kick:subscribe-chat` (Parte 5)                                  |
 | Teste E2E webhook      | `npm run kick:webhook-check` (Parte 6)                                   |
+| Relay Socket.io chat   | `join:chat` / `chat:message` (Parte 7)                                   |
 | Leitura de chat (bot) | `src/chat/wsListener.ts` (Pusher)                                        |
 | Envio de mensagem     | `src/chat/chatSender.ts` → `POST /public/v1/chat`                        |
 | Frontend              | Repositório separado — consome API + Socket.io                           |
@@ -596,24 +597,35 @@ Para o teste **real** da Kick, a assinatura é válida nos dois modos. O probe a
 
 ## Parte 7 — Relay Socket.io para o frontend
 
-### Backend (a implementar)
+> **Status:** implementado no backend — `src/api/chatEvents.ts` + normalização em `src/kick/liveChatMessage.ts`
 
+Fluxo: webhook `chat.message.sent` → normaliza payload → `broadcastChatMessage` → clientes na sala `chat:{channelSlug}`.
 
-| Componente              | Descrição                                 |
-| ----------------------- | ----------------------------------------- |
-| `src/api/chatEvents.ts` | Similar a `alertEvents.ts`                |
-| Evento `join:chat`      | Cliente → servidor (JWT admin)            |
-| Evento `chat:message`   | Servidor → cliente (mensagem normalizada) |
-| Sala Socket.io          | `chat:{channelSlug}`                      |
+### Backend (implementado)
 
+| Componente | Arquivo |
+| ---------- | ------- |
+| Normalização | `src/kick/liveChatMessage.ts` |
+| Socket.io | `src/api/chatEvents.ts` |
+| Integração webhook | `src/api/routes/kickWebhooks.ts` |
 
-### Modelo normalizado sugerido
+| Evento | Direção | Payload |
+| ------ | ------- | ------- |
+| `join:chat` | Cliente → Servidor | `{ token, channelSlug }` — JWT admin |
+| `chat:joined` | Servidor → Cliente | `{ channelSlug }` |
+| `chat:message` | Servidor → Cliente | `LiveChatMessage` + `timestamp` |
+| `chat:error` | Servidor → Cliente | `{ error }` |
+
+Sala Socket.io: `chat:{channelSlug}` (ex.: `chat:unao-da-firma`).
+
+### Modelo `LiveChatMessage`
 
 ```typescript
 interface LiveChatMessage {
   id: string
   content: string
   createdAt: string
+  channelSlug: string
   sender: {
     userId: number
     username: string
@@ -632,12 +644,34 @@ interface LiveChatMessage {
 
 ### Frontend (repositório separado)
 
-1. Conectar Socket.io em `NEXT_PUBLIC_API_URL`
-2. Após login admin, emitir `join:chat`
-3. Escutar `chat:message` e renderizar lista
+1. Conectar Socket.io em `NEXT_PUBLIC_API_URL` (mesma porta da API, ex.: `:3001`)
+2. Após login admin (`POST /api/auth/login`), emitir:
+
+```typescript
+socket.emit("join:chat", {
+  token: adminJwt,
+  channelSlug: "unao-da-firma", // KICK_CHANNEL_SLUG
+});
+```
+
+3. Escutar confirmação e mensagens:
+
+```typescript
+socket.on("chat:joined", ({ channelSlug }) => { /* sala ok */ });
+socket.on("chat:message", (message: LiveChatMessage) => { /* renderizar */ });
+socket.on("chat:error", ({ error }) => { /* tratar erro */ });
+```
+
 4. Parser de emotes: `[emote:id:NOME]` → componente visual
 
-**Checkpoint Parte 7:** mensagem no chat Kick → aparece na tela do dashboard em tempo real.
+### Teste manual (checkpoint Parte 7)
+
+1. Bot rodando (`npm run dev`) + tunnel + webhook ativo (Partes 5–6)
+2. Script Node ou frontend conectado com JWT admin + `join:chat`
+3. Envie mensagem no chat Kick
+4. Cliente recebe evento `chat:message` em tempo real
+
+**Checkpoint Parte 7:** mensagem no chat Kick → evento `chat:message` no cliente Socket.io conectado.
 
 ---
 

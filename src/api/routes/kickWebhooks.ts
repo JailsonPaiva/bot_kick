@@ -10,6 +10,7 @@ import {
   handleKickWebhookEvent,
   parseKickWebhookPayload,
 } from "../../kick/webhookHandler.js";
+import { broadcastChatMessage } from "../chatEvents.js";
 import { getKickWebhookPublicKey } from "../../kick/webhookPublicKey.js";
 import { verifyKickWebhookSignature } from "../../kick/webhookSignature.js";
 
@@ -71,7 +72,10 @@ export function createKickWebhooksRouter(): Router {
     }
 
     try {
-      handleKickWebhookEvent(headers, payload);
+      const liveMessage = handleKickWebhookEvent(headers, payload);
+      if (liveMessage) {
+        broadcastChatMessage(liveMessage.channelSlug, liveMessage);
+      }
       res.status(200).json({ success: true, ok: true });
     } catch (err) {
       logger.error("[WEBHOOK] Erro ao processar evento", err);

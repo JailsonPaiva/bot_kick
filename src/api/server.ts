@@ -24,6 +24,7 @@ import { createPublicRouter } from "./routes/public.js";
 import { createKickWebhooksRouter } from "./routes/kickWebhooks.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
+import { initChatEvents } from "./chatEvents.js";
 import { setupSwagger } from "./swagger.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
@@ -152,6 +153,7 @@ export function startApiServer(services: GameServices): {
 
   initGameEvents(io);
   initAlertEvents(io);
+  initChatEvents(io);
 
   server.listen(API_PORT, () => {
     logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);

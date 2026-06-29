@@ -27,6 +27,10 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
 | \`game:error\` | Servidor → Cliente | Erro na sessão de jogo |
 | \`join:alerts\` | Cliente → Servidor | \`{ token }\` — overlay OBS |
 | \`alert:event\` | Servidor → Cliente | Alerta em tempo real no overlay |
+| \`join:chat\` | Cliente → Servidor | \`{ token, channelSlug }\` — dashboard admin |
+| \`chat:joined\` | Servidor → Cliente | Confirma entrada na sala do chat |
+| \`chat:message\` | Servidor → Cliente | Mensagem normalizada do chat ao vivo |
+| \`chat:error\` | Servidor → Cliente | Erro ao entrar na sala do chat |
 
 ## Variáveis de ambiente
 

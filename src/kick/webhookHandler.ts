@@ -4,6 +4,7 @@
 
 import type { Request } from "express";
 import { logger } from "../utils/logger.js";
+import { normalizeKickChatMessage, type LiveChatMessage } from "./liveChatMessage.js";
 import type {
   KickChatMessageSentPayload,
   KickWebhookHeaders,
@@ -46,7 +47,9 @@ export function parseKickWebhookPayload(rawBody: Buffer): KickWebhookPayload | n
   }
 }
 
-function handleChatMessageSent(payload: KickChatMessageSentPayload): void {
+function handleChatMessageSent(
+  payload: KickChatMessageSentPayload
+): LiveChatMessage | null {
   const sender = payload.sender?.username ?? "?";
   const content = (payload.content ?? "").slice(0, 200);
 
@@ -54,21 +57,34 @@ function handleChatMessageSent(payload: KickChatMessageSentPayload): void {
   logger.info(`  message_id: ${payload.message_id}`);
   logger.info(`  sender: ${sender}`);
   logger.info(`  content: "${content}"`);
+
+  const normalized = normalizeKickChatMessage(
+    payload,
+    process.env.KICK_CHANNEL_SLUG
+  );
+
+  if (!normalized) {
+    logger.warn(
+      "[WEBHOOK] chat.message.sent sem channelSlug — Socket.io não emitido"
+    );
+  }
+
+  return normalized;
 }
 
 export function handleKickWebhookEvent(
   headers: KickWebhookHeaders,
   payload: KickWebhookPayload
-): void {
+): LiveChatMessage | null {
   logger.info(
     `[WEBHOOK] ${headers.eventType} v${headers.eventVersion} msgId=${headers.messageId}`
   );
 
   switch (headers.eventType) {
     case "chat.message.sent":
-      handleChatMessageSent(payload as KickChatMessageSentPayload);
-      break;
+      return handleChatMessageSent(payload as KickChatMessageSentPayload);
     default:
       logger.debug(`[WEBHOOK] Evento não tratado: ${headers.eventType}`);
+      return null;
   }
 }
