@@ -14,6 +14,10 @@ const REFRESH_THRESHOLD_SECONDS = 5 * 60;
 
 let cachedConfig: OAuthConfig | null = null;
 
+export function resetOAuthConfigCache(): void {
+  cachedConfig = null;
+}
+
 function getConfig(): OAuthConfig {
   cachedConfig ??= loadOAuthConfig();
   return cachedConfig;

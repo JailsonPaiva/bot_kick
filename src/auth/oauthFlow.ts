@@ -10,6 +10,7 @@ import open from "open";
 import type { OAuthConfig, TokenResponse } from "./types.js";
 import { saveTokens } from "./tokenStore.js";
 import { logger } from "../utils/logger.js";
+import { KICK_OAUTH_SCOPES } from "./oauthScopes.js";
 
 const TOKEN_URL = "https://id.kick.com/oauth/token";
 const AUTH_URL = "https://id.kick.com/oauth/authorize";
@@ -102,7 +103,7 @@ export function loadOAuthConfig(): OAuthConfig {
     clientId,
     clientSecret,
     redirectUri: `http://localhost:${CALLBACK_PORT}/callback`,
-    scopes: ["user:read", "channel:read", "chat:write"],
+    scopes: [...KICK_OAUTH_SCOPES],
   };
 }
 
@@ -115,6 +116,7 @@ export async function runOAuthFlow(config?: OAuthConfig): Promise<void> {
 
   logger.info("Iniciando fluxo OAuth 2.1 com PKCE...");
   logger.info(`Redirect URI: ${oauthConfig.redirectUri}`);
+  logger.info(`Scopes: ${oauthConfig.scopes.join(" ")}`);
 
   return new Promise<void>((resolve, reject) => {
     const app = express();

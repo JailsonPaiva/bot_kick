@@ -65,8 +65,9 @@ Este guia implementa **leitura oficial via webhook**. O bot pode continuar usand
 
 | Item                  | Situação                                                                 |
 | --------------------- | ------------------------------------------------------------------------ |
-| OAuth scopes          | `user:read`, `channel:read`, `chat:write` — **falta** `events:subscribe` |
-| Webhook handler       | **Não implementado**                                                     |
+| OAuth scopes (código) | `events:subscribe` em `src/auth/oauthScopes.ts` — **relogin manual**     |
+| Webhook handler       | `POST /api/kick/webhooks/events` (Parte 3)                               |
+| Reautenticação OAuth  | `npm run auth:relogin` (Parte 4)                                         |
 | Leitura de chat (bot) | `src/chat/wsListener.ts` (Pusher)                                        |
 | Envio de mensagem     | `src/chat/chatSender.ts` → `POST /public/v1/chat`                        |
 | Frontend              | Repositório separado — consome API + Socket.io                           |
@@ -322,42 +323,61 @@ Campos principais (referência [Webhook Payloads](https://docs.kick.com/events/w
 
 ## Parte 4 — Reautenticar OAuth
 
-O scope `events:subscribe` exige **novo consentimento** OAuth.
+> **Status:** implementado — scope `events:subscribe` + comando `npm run auth:relogin`
 
-### 4.1 Atualizar scopes no código
+O scope `events:subscribe` exige **novo consentimento** OAuth. O token antigo (refresh) **não** ganha scopes novos automaticamente.
 
-Em `src/auth/oauthFlow.ts`:
+### 4.1 Scopes no código (já aplicado)
+
+Arquivo `src/auth/oauthScopes.ts`:
 
 ```typescript
-scopes: [
+export const KICK_OAUTH_SCOPES = [
   "user:read",
   "channel:read",
   "chat:write",
   "events:subscribe",
-],
+];
 ```
 
-### 4.2 Remover token antigo
+### 4.2 Developer Portal — confirme antes do login
 
-```bash
-# Windows PowerShell
-Remove-Item .tokens.json
+Em [kick.com/settings/developer](https://kick.com/settings/developer) → **Edit** no app:
+
+- [ ] `events:subscribe` marcado
+- [ ] Redirect URI = `http://localhost:3000/callback`
+- [ ] Webhooks = **On** (Parte 1)
+
+### 4.3 Refazer OAuth (comando automatizado)
+
+**Pare o bot** (`Ctrl+C`) — a porta 3000 do callback OAuth não pode estar em uso por outro processo.
+
+```powershell
+npm run auth:relogin
 ```
 
-### 4.3 Refazer OAuth
+O script:
 
-```bash
-npm run dev
+1. Remove `.tokens.json`
+2. Abre o browser para autorizar (aceite **todas** as permissões)
+3. Valida via introspect se `events:subscribe` está no token
+4. Exibe `Reautenticação OK` ou erro com scopes ausentes
+
+### 4.4 Alternativa manual
+
+```powershell
+Remove-Item .tokens.json -ErrorAction SilentlyContinue
+npm run auth:relogin
 ```
 
-Autorize no browser — aceite a permissão de **eventos/webhooks**.
+Ou delete `.tokens.json` e rode `npm run dev` (OAuth abre na primeira execução).
 
-### 4.4 Confirmar
+### 4.5 Checkpoint Parte 4
 
+- [ ] Comando termina com `Reautenticação OK`
+- [ ] Saída inclui `events:subscribe` nos scopes concedidos
 - [ ] `.tokens.json` recriado
-- [ ] Bot inicia sem erro de autenticação
-
-**Checkpoint Parte 4:** log `Autenticação OK` no terminal.
+- [ ] `npm run dev` inicia com `Autenticação OK`
 
 ---
 
