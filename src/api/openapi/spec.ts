@@ -59,6 +59,7 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
     { name: "Moderation", description: "Filtros e logs de moderação" },
     { name: "Loyalty", description: "Pontos de fidelidade" },
     { name: "Alerts", description: "Alertas em tempo real (OBS overlay)" },
+    { name: "Chat", description: "Envio de mensagens no chat ao vivo" },
     { name: "Giveaways", description: "Sorteios" },
     { name: "Polls", description: "Enquetes" },
     { name: "Public", description: "Endpoints públicos (sem auth)" },
@@ -826,6 +827,44 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
           "200": { description: "Alerta enviado via Socket.io" },
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/chat/send": {
+      post: {
+        tags: ["Chat"],
+        summary: "Enviar mensagem no chat Kick (dashboard)",
+        description:
+          "Proxy para POST /public/v1/chat da Kick. Requer OAuth com scope chat:write no backend.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["content"],
+                properties: {
+                  content: {
+                    type: "string",
+                    maxLength: 500,
+                    example: "Olá chat!",
+                  },
+                  channelSlug: {
+                    type: "string",
+                    description:
+                      "Opcional — padrão KICK_CHANNEL_SLUG do bot",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Mensagem enviada" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "502": { description: "Falha ao enviar via API Kick" },
         },
       },
     },

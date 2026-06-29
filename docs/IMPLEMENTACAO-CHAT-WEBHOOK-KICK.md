@@ -71,6 +71,7 @@ Este guia implementa **leitura oficial via webhook**. O bot pode continuar usand
 | Inscrição webhook chat | `npm run kick:subscribe-chat` (Parte 5)                                  |
 | Teste E2E webhook      | `npm run kick:webhook-check` (Parte 6)                                   |
 | Relay Socket.io chat   | `join:chat` / `chat:message` (Parte 7)                                   |
+| Envio chat dashboard   | `POST /api/chat/send` (Parte 8)                                          |
 | Leitura de chat (bot) | `src/chat/wsListener.ts` (Pusher)                                        |
 | Envio de mensagem     | `src/chat/chatSender.ts` → `POST /public/v1/chat`                        |
 | Frontend              | Repositório separado — consome API + Socket.io                           |
@@ -677,33 +678,83 @@ socket.on("chat:error", ({ error }) => { /* tratar erro */ });
 
 ## Parte 8 — Enviar mensagem pelo dashboard
 
-### API oficial (só no backend)
+> **Status:** implementado — `POST /api/chat/send` em `src/api/routes/chat.ts`
 
-```http
-POST https://api.kick.com/public/v1/chat
-Authorization: Bearer TOKEN_OAUTH
-Content-Type: application/json
-
-{
-  "broadcaster_user_id": 123456789,
-  "content": "Olá chat!",
-  "type": "user"
-}
-```
-
-Scope necessário: `chat:write` (já configurado).
-
-### Endpoint proxy (a implementar)
+### Endpoint proxy
 
 ```http
 POST /api/chat/send
 Authorization: Bearer JWT_ADMIN
 Content-Type: application/json
 
-{ "content": "Olá chat!" }
+{
+  "content": "Olá chat!",
+  "channelSlug": "unao-da-firma"
+}
 ```
 
-Reutiliza lógica de `src/chat/chatSender.ts`.
+| Campo | Obrigatório | Descrição |
+| ----- | ----------- | --------- |
+| `content` | Sim | Texto (1–500 chars, trim automático) |
+| `channelSlug` | Não | Padrão: `KICK_CHANNEL_SLUG` do `.env` |
+
+**Resposta 200:**
+
+```json
+{
+  "success": true,
+  "message": "Mensagem enviada",
+  "data": {
+    "broadcasterUserId": 123456,
+    "channelSlug": "unao-da-firma"
+  }
+}
+```
+
+**Erros:**
+
+| HTTP | Causa |
+| ---- | ----- |
+| 400 | `content` vazio ou > 500 caracteres |
+| 401 | JWT admin ausente/inválido |
+| 502 | Falha na API Kick (OAuth, rate limit, etc.) |
+
+### Comportamento
+
+- Usa `sendMessage()` de `src/chat/chatSender.ts` com **`useBotPrefix: false`** (sem `[BOT]`)
+- Resolve `broadcaster_user_id` via API Kick (`fetchBroadcasterUserId` ou OAuth)
+- Scope OAuth necessário no backend: `chat:write` (já configurado na Parte 4)
+
+### Teste via Swagger ou curl
+
+```powershell
+# 1. Login
+$login = Invoke-RestMethod -Uri "http://localhost:3001/api/auth/login" `
+  -Method POST -ContentType "application/json" `
+  -Body '{"password":"admin"}'
+$token = $login.data.token
+
+# 2. Enviar
+Invoke-RestMethod -Uri "http://localhost:3001/api/chat/send" `
+  -Method POST `
+  -Headers @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" } `
+  -Body '{"content":"teste dashboard"}'
+```
+
+### Frontend (repo separado)
+
+```typescript
+await fetch(`${API_URL}/api/chat/send`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${adminJwt}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ content: texto }),
+});
+```
+
+A mensagem enviada também volta via webhook → `chat:message` no Socket.io (se Partes 5–7 ativas).
 
 **Checkpoint Parte 8:** mensagem digitada no dashboard → aparece no chat da Kick.
 

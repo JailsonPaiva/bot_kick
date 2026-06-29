@@ -11,6 +11,11 @@ import { logger } from "../utils/logger.js";
 const CHAT_URL = "https://api.kick.com/public/v1/chat";
 const MAX_MESSAGE_LENGTH = 500;
 
+export interface SendMessageOptions {
+  /** Prefixo [BOT] — padrão true para respostas automáticas do bot */
+  useBotPrefix?: boolean;
+}
+
 interface SendMessageBody {
   broadcaster_user_id: number;
   content: string;
@@ -20,6 +25,7 @@ interface SendMessageBody {
 interface QueuedMessage {
   broadcasterId: number;
   content: string;
+  useBotPrefix: boolean;
   resolve: () => void;
   reject: (err: Error) => void;
 }
@@ -27,16 +33,16 @@ interface QueuedMessage {
 let queue: QueuedMessage[] = [];
 let processing = false;
 
-function formatChatContent(content: string): string {
+function formatChatContent(content: string, useBotPrefix: boolean): string {
   const trimmed = content.trim();
-  if (!gameConfig.botMessagePrefix || trimmed.startsWith("[BOT]")) {
+  if (!useBotPrefix || !gameConfig.botMessagePrefix || trimmed.startsWith("[BOT]")) {
     return trimmed;
   }
   return `[BOT] ${trimmed}`;
 }
 
-function truncateContent(content: string): string {
-  const formatted = formatChatContent(content);
+function truncateContent(content: string, useBotPrefix: boolean): string {
+  const formatted = formatChatContent(content, useBotPrefix);
   if (formatted.length <= MAX_MESSAGE_LENGTH) {
     return formatted;
   }
@@ -48,12 +54,13 @@ function truncateContent(content: string): string {
 
 async function postMessage(
   broadcasterId: number,
-  content: string
+  content: string,
+  useBotPrefix: boolean
 ): Promise<void> {
   const token = await getValidToken();
   const body: SendMessageBody = {
     broadcaster_user_id: broadcasterId,
-    content: truncateContent(content),
+    content: truncateContent(content, useBotPrefix),
     type: "user",
   };
 
@@ -75,7 +82,7 @@ async function postMessage(
         const retrySeconds = parseRetryAfter(retryAfterHeader);
         logger.warn(`Rate limit (429) — aguardando ${retrySeconds}s antes de reenviar`);
         await sleep(retrySeconds * 1000);
-        return postMessage(broadcasterId, content);
+        return postMessage(broadcasterId, content, useBotPrefix);
       }
 
       const detail = axiosError.response?.data
@@ -107,7 +114,7 @@ async function processQueue(): Promise<void> {
     if (!item) break;
 
     try {
-      await postMessage(item.broadcasterId, item.content);
+      await postMessage(item.broadcasterId, item.content, item.useBotPrefix);
       item.resolve();
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -119,9 +126,15 @@ async function processQueue(): Promise<void> {
   processing = false;
 }
 
-export function sendMessage(broadcasterId: number, content: string): Promise<void> {
+export function sendMessage(
+  broadcasterId: number,
+  content: string,
+  options: SendMessageOptions = {}
+): Promise<void> {
+  const useBotPrefix = options.useBotPrefix ?? true;
+
   return new Promise<void>((resolve, reject) => {
-    queue.push({ broadcasterId, content, resolve, reject });
+    queue.push({ broadcasterId, content, useBotPrefix, resolve, reject });
     void processQueue();
   });
 }

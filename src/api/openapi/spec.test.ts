@@ -21,6 +21,7 @@ const REQUIRED_PATHS = [
   "/api/alerts/overlay-token",
   "/api/alerts/config",
   "/api/alerts/test",
+  "/api/chat/send",
   "/api/giveaways",
   "/api/giveaways/draw",
   "/api/giveaways/reroll",

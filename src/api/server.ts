@@ -22,6 +22,7 @@ import { createGiveawaysRouter } from "./routes/giveaways.js";
 import { createPollsRouter } from "./routes/polls.js";
 import { createPublicRouter } from "./routes/public.js";
 import { createKickWebhooksRouter } from "./routes/kickWebhooks.js";
+import { createChatRouter } from "./routes/chat.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
 import { initChatEvents } from "./chatEvents.js";
@@ -88,6 +89,7 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createGiveawaysRouter());
   app.use("/api", createPollsRouter());
   app.use("/api", createPublicRouter());
+  app.use("/api", createChatRouter());
 
   setupSwagger(app);
 
@@ -146,6 +148,7 @@ export function startApiServer(services: GameServices): {
           "POST /api/polls/end",
         ],
         public: ["GET /api/public/ranking/:channelSlug"],
+        chat: ["POST /api/chat/send"],
         kickWebhooks: ["POST /api/kick/webhooks/events"],
       },
     });
