@@ -72,6 +72,7 @@ Este guia implementa **leitura oficial via webhook**. O bot pode continuar usand
 | Teste E2E webhook      | `npm run kick:webhook-check` (Parte 6)                                   |
 | Relay Socket.io chat   | `join:chat` / `chat:message` (Parte 7)                                   |
 | Envio chat dashboard   | `POST /api/chat/send` (Parte 8)                                          |
+| Moderação chat Kick    | `DELETE /api/chat/:id`, ban/unban (Parte 9)                              |
 | Leitura de chat (bot) | `src/chat/wsListener.ts` (Pusher)                                        |
 | Envio de mensagem     | `src/chat/chatSender.ts` → `POST /public/v1/chat`                        |
 | Frontend              | Repositório separado — consome API + Socket.io                           |
@@ -762,20 +763,116 @@ A mensagem enviada também volta via webhook → `chat:message` no Socket.io (se
 
 ## Parte 9 — Moderação (opcional)
 
+> **Status:** implementado — proxies em `src/api/routes/chat.ts` + `src/kick/chatModerationApi.ts`
 
-| Ação            | API Kick                              | Scope                            |
-| --------------- | ------------------------------------- | -------------------------------- |
-| Apagar mensagem | `DELETE /public/v1/chat/{message_id}` | `moderation:chat_message:manage` |
-| Ban / timeout   | `POST /public/v1/moderation/bans`     | `moderation:ban`                 |
-| Remover ban     | `DELETE /public/v1/moderation/bans`   | `moderation:ban`                 |
+### Pré-requisito OAuth
 
+Marque no [Developer Portal](https://kick.com/settings/developer):
 
-Requer adicionar scopes no portal + refazer OAuth (Parte 4).
+| Scope | Uso |
+| ----- | --- |
+| `moderation:chat_message:manage` | Apagar mensagem |
+| `moderation:ban` | Ban / timeout / unban |
 
-Endpoints proxy sugeridos no backend:
+Depois refaça OAuth:
 
-- `DELETE /api/chat/:messageId`
-- `POST /api/chat/moderation/ban`
+```powershell
+npm run auth:relogin
+```
+
+Os scopes já estão em `src/auth/oauthScopes.ts`.
+
+### Endpoints proxy
+
+#### Apagar mensagem
+
+```http
+DELETE /api/chat/{messageId}
+Authorization: Bearer JWT_ADMIN
+```
+
+`messageId` = campo `id` recebido em `chat:message` (Socket.io).
+
+**Resposta 200:**
+
+```json
+{
+  "success": true,
+  "message": "Mensagem apagada",
+  "data": { "messageId": "..." }
+}
+```
+
+#### Ban ou timeout
+
+```http
+POST /api/chat/moderation/ban
+Authorization: Bearer JWT_ADMIN
+Content-Type: application/json
+
+{
+  "userId": 123456,
+  "channelSlug": "unao-da-firma",
+  "durationMinutes": 10,
+  "reason": "spam"
+}
+```
+
+| Campo | Obrigatório | Descrição |
+| ----- | ----------- | --------- |
+| `userId` | Sim | ID Kick do usuário (`sender.userId` no `chat:message`) |
+| `channelSlug` | Não | Padrão `KICK_CHANNEL_SLUG` |
+| `durationMinutes` | Não | 1–10080; omitir = **ban permanente** |
+| `reason` | Não | Até 100 caracteres |
+
+#### Remover ban / timeout
+
+```http
+DELETE /api/chat/moderation/ban
+Authorization: Bearer JWT_ADMIN
+Content-Type: application/json
+
+{
+  "userId": 123456,
+  "channelSlug": "unao-da-firma"
+}
+```
+
+### Erros comuns
+
+| HTTP | Causa |
+| ---- | ----- |
+| 400 | Payload inválido |
+| 401 | JWT admin ausente |
+| 502 | API Kick falhou (403 = scopes OAuth ausentes → `auth:relogin`) |
+
+### Frontend (repo separado)
+
+Use o `message.id` e `sender.userId` do evento `chat:message`:
+
+```typescript
+// Apagar
+await fetch(`${API_URL}/api/chat/${message.id}`, {
+  method: "DELETE",
+  headers: { Authorization: `Bearer ${adminJwt}` },
+});
+
+// Timeout 10 min
+await fetch(`${API_URL}/api/chat/moderation/ban`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${adminJwt}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    userId: message.sender.userId,
+    durationMinutes: 10,
+    reason: "moderação dashboard",
+  }),
+});
+```
+
+**Checkpoint Parte 9:** ações do dashboard refletem no chat Kick (mensagem some / usuário banido ou em timeout).
 
 ---
 

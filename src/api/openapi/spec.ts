@@ -868,6 +868,93 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
         },
       },
     },
+    "/api/chat/{messageId}": {
+      delete: {
+        tags: ["Chat"],
+        summary: "Apagar mensagem do chat Kick",
+        description:
+          "Proxy para DELETE /public/v1/chat/{message_id}. Requer scope moderation:chat_message:manage no OAuth do backend.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "messageId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": { description: "Mensagem apagada" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "502": { description: "Falha na API Kick" },
+        },
+      },
+    },
+    "/api/chat/moderation/ban": {
+      post: {
+        tags: ["Chat"],
+        summary: "Banir ou dar timeout em usuário",
+        description:
+          "Proxy para POST /public/v1/moderation/bans. Sem durationMinutes = ban permanente.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: {
+                  userId: { type: "integer", example: 123456 },
+                  channelSlug: { type: "string" },
+                  durationMinutes: {
+                    type: "integer",
+                    minimum: 1,
+                    maximum: 10080,
+                    description: "Timeout em minutos; omitir para ban permanente",
+                  },
+                  reason: { type: "string", maxLength: 100 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Ban ou timeout aplicado" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "502": { description: "Falha na API Kick" },
+        },
+      },
+      delete: {
+        tags: ["Chat"],
+        summary: "Remover ban ou timeout",
+        description: "Proxy para DELETE /public/v1/moderation/bans",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: {
+                  userId: { type: "integer", example: 123456 },
+                  channelSlug: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Ban/timeout removido" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "502": { description: "Falha na API Kick" },
+        },
+      },
+    },
     "/api/giveaways": {
       get: {
         tags: ["Giveaways"],

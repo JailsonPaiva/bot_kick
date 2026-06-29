@@ -13,6 +13,11 @@ describe("oauthScopes", () => {
     assert.ok(KICK_OAUTH_SCOPES.includes("events:subscribe"));
   });
 
+  it("inclui scopes de moderação nos scopes padrão", () => {
+    assert.ok(KICK_OAUTH_SCOPES.includes("moderation:ban"));
+    assert.ok(KICK_OAUTH_SCOPES.includes("moderation:chat_message:manage"));
+  });
+
   it("loadOAuthConfig solicita events:subscribe", () => {
     process.env.KICK_CLIENT_ID = "test-client";
     process.env.KICK_CLIENT_SECRET = "test-secret";
@@ -38,7 +43,7 @@ describe("oauthScopes", () => {
   it("hasRequiredScopes retorna true quando todos presentes", () => {
     assert.equal(
       hasRequiredScopes(
-        "user:read channel:read chat:write events:subscribe",
+        "user:read channel:read chat:write events:subscribe moderation:ban moderation:chat_message:manage",
         KICK_OAUTH_SCOPES
       ),
       true

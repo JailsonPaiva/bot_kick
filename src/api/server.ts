@@ -148,7 +148,12 @@ export function startApiServer(services: GameServices): {
           "POST /api/polls/end",
         ],
         public: ["GET /api/public/ranking/:channelSlug"],
-        chat: ["POST /api/chat/send"],
+        chat: [
+          "POST /api/chat/send",
+          "DELETE /api/chat/:messageId",
+          "POST /api/chat/moderation/ban",
+          "DELETE /api/chat/moderation/ban",
+        ],
         kickWebhooks: ["POST /api/kick/webhooks/events"],
       },
     });

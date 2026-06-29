@@ -8,12 +8,20 @@ export const KICK_OAUTH_SCOPES = [
   "channel:read",
   "chat:write",
   "events:subscribe",
+  "moderation:ban",
+  "moderation:chat_message:manage",
 ] as const;
 
 export type KickOAuthScope = (typeof KICK_OAUTH_SCOPES)[number];
 
 /** Scope mínimo exigido para webhooks de chat (Parte 4+). */
 export const KICK_WEBHOOK_REQUIRED_SCOPES = ["events:subscribe"] as const;
+
+/** Scopes exigidos para moderação via API (Parte 9). */
+export const KICK_MODERATION_SCOPES = [
+  "moderation:ban",
+  "moderation:chat_message:manage",
+] as const;
 
 export function parseScopeString(scope: string): string[] {
   return scope.trim().split(/\s+/).filter(Boolean);
