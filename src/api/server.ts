@@ -113,6 +113,9 @@ export function startApiServer(services: GameServices): {
           "PUT /api/commands/:id",
           "PATCH /api/commands/:id/toggle",
           "DELETE /api/commands/:id",
+          "GET /api/commands/system",
+          "PUT /api/commands/system/:trigger",
+          "PATCH /api/commands/system/:trigger/toggle",
         ],
         timers: [
           "GET /api/timers",

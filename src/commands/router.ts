@@ -6,6 +6,8 @@
 import type { ChatMessage } from "../chat/types.js";
 import { logger } from "../utils/logger.js";
 import { parseCommand } from "./parser.js";
+import { isSystemCommandActive } from "./systemCommandConfigService.js";
+import { isKnownSystemCommand } from "./systemCommandsCatalog.js";
 import type { CommandContext, CommandHandler, ParsedCommand } from "./types.js";
 import { tryExecuteCustomCommand } from "./customCommands.js";
 
@@ -36,6 +38,14 @@ export class CommandRouter {
 
     const handler = this.handlers.get(parsed.command);
     if (handler) {
+      if (isKnownSystemCommand(parsed.command)) {
+        const active = await isSystemCommandActive(ctx.channelSlug, parsed.command);
+        if (!active) {
+          logger.info(`[CHAT] Comando !${parsed.command} desativado — ignorado`);
+          return;
+        }
+      }
+
       try {
         await handler(parsed, ctx);
       } catch (err) {

@@ -4,6 +4,12 @@
 
 import { Router } from "express";
 import { prisma } from "../../infra/prisma/client.js";
+import {
+  listSystemCommands,
+  toggleSystemCommand,
+  updateSystemCommand,
+} from "../../commands/systemCommandConfigService.js";
+import { getSystemCommandDefinition } from "../../commands/systemCommandsCatalog.js";
 import { authMiddleware } from "../auth.js";
 import type { ApiResponse } from "../types.js";
 
@@ -114,6 +120,61 @@ export function createCommandsRouter(): Router {
     try {
       await prisma.command.delete({ where: { id } });
       res.json({ success: true, message: "Comando removido" } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.get("/commands/system", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    try {
+      const commands = await listSystemCommands(channelSlug);
+      res.json({ success: true, data: commands } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.put("/commands/system/:trigger", authMiddleware, async (req, res) => {
+    const channelSlug = (req.body.channelSlug as string) || DEFAULT_CHANNEL;
+    const trigger = Array.isArray(req.params.trigger)
+      ? req.params.trigger[0]
+      : req.params.trigger;
+    const { response, isActive } = req.body as {
+      response?: string;
+      isActive?: boolean;
+    };
+
+    if (!getSystemCommandDefinition(trigger)) {
+      res.status(404).json({ success: false, error: "Comando padrão não encontrado" });
+      return;
+    }
+
+    try {
+      const command = await updateSystemCommand(channelSlug, trigger, {
+        ...(response !== undefined && { response }),
+        ...(isActive !== undefined && { isActive }),
+      });
+      res.json({ success: true, data: command } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.patch("/commands/system/:trigger/toggle", authMiddleware, async (req, res) => {
+    const channelSlug = (req.body.channelSlug as string) || DEFAULT_CHANNEL;
+    const trigger = Array.isArray(req.params.trigger)
+      ? req.params.trigger[0]
+      : req.params.trigger;
+
+    if (!getSystemCommandDefinition(trigger)) {
+      res.status(404).json({ success: false, error: "Comando padrão não encontrado" });
+      return;
+    }
+
+    try {
+      const command = await toggleSystemCommand(channelSlug, trigger);
+      res.json({ success: true, data: command } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

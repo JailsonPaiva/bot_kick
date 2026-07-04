@@ -62,6 +62,19 @@ model Command {
   @@index([channelSlug, isActive])
 }
 
+model SystemCommandConfig {
+  id          String   @id @default(uuid())
+  channelSlug String
+  trigger     String
+  response    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channelSlug, trigger])
+  @@index([channelSlug, isActive])
+}
+
 // ─── Fase 2 — Timers ─────────────────────────────────────────────────────────
 
 model Timer {

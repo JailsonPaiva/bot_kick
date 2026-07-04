@@ -4,7 +4,13 @@
 
 import { sendMessage } from "../../chat/chatSender.js";
 import { logger } from "../../utils/logger.js";
+import { getSystemCommandResponseOverride } from "../systemCommandConfigService.js";
+import { getSystemCommandDefinition } from "../systemCommandsCatalog.js";
 import type { CommandHandler } from "../types.js";
+
+function substituteUser(template: string, username: string): string {
+  return template.replace(/\{user\}/gi, `@${username}`);
+}
 
 export const handleEcho: CommandHandler = async (parsed, ctx) => {
   const echoText = parsed.rawArgs.trim();
@@ -18,7 +24,10 @@ export const handleEcho: CommandHandler = async (parsed, ctx) => {
 
 export const handlePing: CommandHandler = async (_parsed, ctx) => {
   const username = ctx.message.sender.username;
-  const reply = `@${username} pong! 🏓`;
+  const override = await getSystemCommandResponseOverride(ctx.channelSlug, "ping");
+  const def = getSystemCommandDefinition("ping");
+  const template = override ?? def?.defaultResponse ?? `@${username} pong! 🏓`;
+  const reply = substituteUser(template, username);
 
   await sendMessage(ctx.broadcasterId, reply);
   logger.info(`[PING] Respondido para ${username}`);
