@@ -6,6 +6,7 @@ import { Router } from "express";
 import { authMiddleware } from "../auth.js";
 import { pollService } from "../../engagement/pollService.js";
 import type { ApiResponse } from "../types.js";
+import { serializeBigInts } from "../../utils/serializeBigInt.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
 
@@ -16,7 +17,7 @@ export function createPollsRouter(): Router {
     const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
     try {
       const data = await pollService.listRecent(channelSlug);
-      res.json({ success: true, data } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(data) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
@@ -45,7 +46,10 @@ export function createPollsRouter(): Router {
         durationS,
         weightedSubs
       );
-      res.status(201).json({ success: true, data: poll } satisfies ApiResponse);
+      res.status(201).json({
+        success: true,
+        data: serializeBigInts(poll),
+      } satisfies ApiResponse);
     } catch (err) {
       res.status(400).json({ success: false, error: String(err) });
     }
@@ -59,7 +63,7 @@ export function createPollsRouter(): Router {
         res.status(400).json({ success: false, error: result.error });
         return;
       }
-      res.json({ success: true, data: result } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(result) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

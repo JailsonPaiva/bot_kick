@@ -5,6 +5,10 @@
 import { Router } from "express";
 import { prisma } from "../../infra/prisma/client.js";
 import type { ApiResponse } from "../types.js";
+import {
+  mapGroupedPointsToRankingEntry,
+  mapViewerPointsToRankingEntry,
+} from "../publicRanking.js";
 
 type Period = "week" | "month" | "all";
 
@@ -33,11 +37,12 @@ export function createPublicRouter(): Router {
 
     try {
       if (period === "all") {
-        const ranking = await prisma.viewerPoints.findMany({
+        const rows = await prisma.viewerPoints.findMany({
           where: { channelSlug },
           orderBy: [{ balance: "desc" }, { updatedAt: "asc" }],
           take: limit,
         });
+        const ranking = rows.map(mapViewerPointsToRankingEntry);
         res.json({ success: true, data: { period, ranking } } satisfies ApiResponse);
         return;
       }
@@ -57,15 +62,13 @@ export function createPublicRouter(): Router {
       });
       const map = new Map(viewers.map((v) => [v.kickUserId.toString(), v]));
 
-      const ranking = grouped.map((g) => {
-        const viewer = map.get(g.kickUserId.toString());
-        return {
-          kickUserId: g.kickUserId.toString(),
-          username: viewer?.username ?? `user-${g.kickUserId.toString()}`,
-          slug: viewer?.slug ?? `user-${g.kickUserId.toString()}`,
-          points: g._sum.amount ?? 0,
-        };
-      });
+      const ranking = grouped.map((g) =>
+        mapGroupedPointsToRankingEntry(
+          g.kickUserId,
+          g._sum.amount ?? 0,
+          map.get(g.kickUserId.toString())
+        )
+      );
 
       res.json({ success: true, data: { period, ranking } } satisfies ApiResponse);
     } catch (err) {

@@ -6,6 +6,7 @@ import { Router } from "express";
 import { prisma } from "../../infra/prisma/client.js";
 import { authMiddleware } from "../auth.js";
 import type { ApiResponse } from "../types.js";
+import { serializeBigInts } from "../../utils/serializeBigInt.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
 
@@ -22,7 +23,7 @@ export function createLoyaltyRouter(): Router {
         orderBy: [{ balance: "desc" }, { updatedAt: "asc" }],
         take: Math.min(Math.max(limit, 1), 100),
       });
-      res.json({ success: true, data: top } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(top) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
@@ -44,15 +45,17 @@ export function createLoyaltyRouter(): Router {
         prisma.pointTransaction.count({ where: { channelSlug } }),
       ]);
 
-      res.json({
-        success: true,
-        data: {
-          transactions,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
-      } satisfies ApiResponse);
+      res.json(
+        serializeBigInts({
+          success: true,
+          data: {
+            transactions,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+          },
+        }) satisfies ApiResponse
+      );
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

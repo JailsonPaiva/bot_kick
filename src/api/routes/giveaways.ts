@@ -6,6 +6,7 @@ import { Router } from "express";
 import { authMiddleware } from "../auth.js";
 import { giveawayService } from "../../engagement/giveawayService.js";
 import type { ApiResponse } from "../types.js";
+import { serializeBigInts } from "../../utils/serializeBigInt.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
 
@@ -16,7 +17,7 @@ export function createGiveawaysRouter(): Router {
     const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
     try {
       const data = await giveawayService.listRecent(channelSlug);
-      res.json({ success: true, data } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(data) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
@@ -40,7 +41,10 @@ export function createGiveawaysRouter(): Router {
         filterType,
         costPoints
       );
-      res.status(201).json({ success: true, data: giveaway } satisfies ApiResponse);
+      res.status(201).json({
+        success: true,
+        data: serializeBigInts(giveaway),
+      } satisfies ApiResponse);
     } catch (err) {
       res.status(400).json({ success: false, error: String(err) });
     }
@@ -54,7 +58,7 @@ export function createGiveawaysRouter(): Router {
         res.status(400).json({ success: false, error: result.error });
         return;
       }
-      res.json({ success: true, data: result } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(result) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
@@ -68,7 +72,7 @@ export function createGiveawaysRouter(): Router {
         res.status(400).json({ success: false, error: result.error });
         return;
       }
-      res.json({ success: true, data: result } satisfies ApiResponse);
+      res.json({ success: true, data: serializeBigInts(result) } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
