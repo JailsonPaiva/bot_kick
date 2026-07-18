@@ -253,6 +253,56 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
           durationMs: { type: "integer", default: 5000 },
         },
       },
+      LoyaltyConfig: {
+        type: "object",
+        properties: {
+          channelSlug: { type: "string" },
+          chatEnabled: { type: "boolean" },
+          pointsPerChatActivity: { type: "integer" },
+          chatIntervalSeconds: { type: "integer" },
+          memberMultiplier: { type: "number" },
+          memberBonusFlat: { type: "integer" },
+          eventFollowEnabled: { type: "boolean" },
+          eventFollowPoints: { type: "integer" },
+          eventSubscriptionEnabled: { type: "boolean" },
+          eventSubscriptionPoints: { type: "integer" },
+          eventGiftSubEnabled: { type: "boolean" },
+          eventGiftSubPoints: { type: "integer" },
+          eventRaidEnabled: { type: "boolean" },
+          eventRaidPoints: { type: "integer" },
+        },
+      },
+      LoyaltyConfigUpdate: {
+        type: "object",
+        properties: {
+          channelSlug: { type: "string" },
+          chatEnabled: { type: "boolean" },
+          pointsPerChatActivity: { type: "integer", minimum: 0, maximum: 100000 },
+          chatIntervalSeconds: { type: "integer", minimum: 10, maximum: 3600 },
+          memberMultiplier: { type: "number", minimum: 1, maximum: 10 },
+          memberBonusFlat: { type: "integer", minimum: 0, maximum: 10000 },
+          eventFollowEnabled: { type: "boolean" },
+          eventFollowPoints: { type: "integer" },
+          eventSubscriptionEnabled: { type: "boolean" },
+          eventSubscriptionPoints: { type: "integer" },
+          eventGiftSubEnabled: { type: "boolean" },
+          eventGiftSubPoints: { type: "integer" },
+          eventRaidEnabled: { type: "boolean" },
+          eventRaidPoints: { type: "integer" },
+        },
+      },
+      LoyaltyTestEvent: {
+        type: "object",
+        properties: {
+          channelSlug: { type: "string" },
+          eventType: {
+            type: "string",
+            enum: ["follow", "subscription", "gift_sub", "raid"],
+            default: "follow",
+          },
+          username: { type: "string", default: "viewer" },
+        },
+      },
     },
     responses: {
       Unauthorized: {
@@ -734,6 +784,84 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
         ],
         responses: {
           "200": { description: "Transações paginadas" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/loyalty/config": {
+      get: {
+        tags: ["Loyalty"],
+        summary: "Obter configuração de pontos do canal",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "channel", in: "query", schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "Configuração de loyalty",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: { $ref: "#/components/schemas/LoyaltyConfig" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      put: {
+        tags: ["Loyalty"],
+        summary: "Atualizar configuração de pontos do canal",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/LoyaltyConfigUpdate" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Configuração atualizada",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: { $ref: "#/components/schemas/LoyaltyConfig" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/loyalty/test-event": {
+      post: {
+        tags: ["Loyalty"],
+        summary: "Simular crédito de pontos por evento",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/LoyaltyTestEvent" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Resultado do crédito de teste" },
+          "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },

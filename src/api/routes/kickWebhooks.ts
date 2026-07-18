@@ -7,12 +7,13 @@ import { Router, type Request, type Response } from "express";
 import { logger } from "../../utils/logger.js";
 import {
   extractKickWebhookHeaders,
-  handleKickWebhookEvent,
+  handleKickWebhookEventFull,
   parseKickWebhookPayload,
 } from "../../kick/webhookHandler.js";
 import { broadcastChatMessage } from "../chatEvents.js";
 import { getKickWebhookPublicKey } from "../../kick/webhookPublicKey.js";
 import { verifyKickWebhookSignature } from "../../kick/webhookSignature.js";
+import { loyaltyService } from "../../loyalty/loyaltyService.js";
 
 function isSkipVerifyEnabled(): boolean {
   return process.env.KICK_WEBHOOK_SKIP_VERIFY === "true";
@@ -72,9 +73,25 @@ export function createKickWebhooksRouter(): Router {
     }
 
     try {
-      const liveMessage = handleKickWebhookEvent(headers, payload);
-      if (liveMessage) {
-        broadcastChatMessage(liveMessage.channelSlug, liveMessage);
+      const { chatMessage, loyaltyAward } = handleKickWebhookEventFull(
+        headers,
+        payload
+      );
+      if (chatMessage) {
+        broadcastChatMessage(chatMessage.channelSlug, chatMessage);
+      }
+      if (loyaltyAward) {
+        const result = await loyaltyService.awardForEvent(
+          loyaltyAward.channelSlug,
+          loyaltyAward.user,
+          loyaltyAward.eventType,
+          { isMember: loyaltyAward.isMember }
+        );
+        if (result.awarded > 0) {
+          logger.info(
+            `[WEBHOOK] loyalty awarded=${result.awarded} type=${loyaltyAward.eventType} user=${loyaltyAward.user.username}`
+          );
+        }
       }
       res.status(200).json({ success: true, ok: true });
     } catch (err) {

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { handleKickWebhookEvent } from "./webhookHandler.js";
+import {
+  handleKickWebhookEvent,
+  handleKickWebhookEventFull,
+} from "./webhookHandler.js";
 import type { KickWebhookHeaders } from "./webhookTypes.js";
 
 const HEADERS: KickWebhookHeaders = {
@@ -33,11 +36,25 @@ describe("webhookHandler", () => {
     assert.equal(message?.channelSlug, "canal-teste");
   });
 
-  it("handleKickWebhookEvent retorna null para evento desconhecido", () => {
+  it("handleKickWebhookEvent retorna null para evento sem chat (follow)", () => {
     const result = handleKickWebhookEvent(
       { ...HEADERS, eventType: "channel.followed" },
       { follower: { user_id: 1 } }
     );
     assert.equal(result, null);
+  });
+
+  it("handleKickWebhookEventFull extrai award de follow", () => {
+    const full = handleKickWebhookEventFull(
+      { ...HEADERS, eventType: "channel.followed" },
+      {
+        broadcaster: { channel_slug: "canal-x" },
+        follower: { user_id: 9, username: "fa" },
+      }
+    );
+    assert.equal(full.chatMessage, null);
+    assert.ok(full.loyaltyAward);
+    assert.equal(full.loyaltyAward?.eventType, "follow");
+    assert.equal(full.loyaltyAward?.user.kickUserId, 9);
   });
 });

@@ -132,6 +132,9 @@ export function startApiServer(services: GameServices): {
         loyalty: [
           "GET /api/loyalty/top",
           "GET /api/loyalty/transactions",
+          "GET /api/loyalty/config",
+          "PUT /api/loyalty/config",
+          "POST /api/loyalty/test-event",
         ],
         alerts: [
           "GET /api/alerts/overlay-token",

@@ -124,6 +124,26 @@ model ModerationLog {
 
 // ─── Fase 3 — Loyalty points e alertas ───────────────────────────────────────
 
+model LoyaltyConfig {
+  id                     String   @id @default(uuid())
+  channelSlug            String   @unique
+  chatEnabled            Boolean  @default(true)
+  pointsPerChatActivity  Int      @default(1)
+  chatIntervalSeconds    Int      @default(60)
+  memberMultiplier       Float    @default(1)
+  memberBonusFlat        Int      @default(0)
+  eventFollowEnabled     Boolean  @default(false)
+  eventFollowPoints      Int      @default(0)
+  eventSubscriptionEnabled Boolean @default(false)
+  eventSubscriptionPoints  Int    @default(0)
+  eventGiftSubEnabled    Boolean  @default(false)
+  eventGiftSubPoints     Int      @default(0)
+  eventRaidEnabled       Boolean  @default(false)
+  eventRaidPoints        Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
 model ViewerPoints {
   id         String   @id @default(uuid())
   channelSlug String

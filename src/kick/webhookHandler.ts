@@ -5,6 +5,7 @@
 import type { Request } from "express";
 import { logger } from "../utils/logger.js";
 import { normalizeKickChatMessage, type LiveChatMessage } from "./liveChatMessage.js";
+import { extractLoyaltyAwardFromWebhook, type LoyaltyWebhookAward } from "./loyaltyWebhookEvents.js";
 import type {
   KickChatMessageSentPayload,
   KickWebhookHeaders,
@@ -72,19 +73,46 @@ function handleChatMessageSent(
   return normalized;
 }
 
+export interface KickWebhookHandleResult {
+  chatMessage: LiveChatMessage | null;
+  loyaltyAward: LoyaltyWebhookAward | null;
+}
+
 export function handleKickWebhookEvent(
   headers: KickWebhookHeaders,
   payload: KickWebhookPayload
 ): LiveChatMessage | null {
+  return handleKickWebhookEventFull(headers, payload).chatMessage;
+}
+
+export function handleKickWebhookEventFull(
+  headers: KickWebhookHeaders,
+  payload: KickWebhookPayload
+): KickWebhookHandleResult {
   logger.info(
     `[WEBHOOK] ${headers.eventType} v${headers.eventVersion} msgId=${headers.messageId}`
   );
 
-  switch (headers.eventType) {
-    case "chat.message.sent":
-      return handleChatMessageSent(payload as KickChatMessageSentPayload);
-    default:
-      logger.debug(`[WEBHOOK] Evento não tratado: ${headers.eventType}`);
-      return null;
+  if (headers.eventType === "chat.message.sent") {
+    return {
+      chatMessage: handleChatMessageSent(payload as KickChatMessageSentPayload),
+      loyaltyAward: null,
+    };
   }
+
+  const loyaltyAward = extractLoyaltyAwardFromWebhook(
+    headers.eventType,
+    payload,
+    process.env.KICK_CHANNEL_SLUG
+  );
+
+  if (loyaltyAward) {
+    logger.info(
+      `[WEBHOOK] loyalty event=${loyaltyAward.eventType} user=${loyaltyAward.user.username} channel=${loyaltyAward.channelSlug}`
+    );
+  } else {
+    logger.debug(`[WEBHOOK] Evento não tratado: ${headers.eventType}`);
+  }
+
+  return { chatMessage: null, loyaltyAward };
 }

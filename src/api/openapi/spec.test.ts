@@ -18,6 +18,8 @@ const REQUIRED_PATHS = [
   "/api/moderation/logs",
   "/api/loyalty/top",
   "/api/loyalty/transactions",
+  "/api/loyalty/config",
+  "/api/loyalty/test-event",
   "/api/alerts/overlay-token",
   "/api/alerts/config",
   "/api/alerts/test",
