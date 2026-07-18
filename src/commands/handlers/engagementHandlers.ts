@@ -6,7 +6,12 @@
 
 import { sendMessage } from "../../chat/chatSender.js";
 import type { CommandHandler } from "../types.js";
-import { giveawayService } from "../../engagement/giveawayService.js";
+import {
+  describeEntryInstructions,
+  giveawayService,
+  normalizeEntryCommand,
+  normalizeEntryMode,
+} from "../../engagement/giveawayService.js";
 import { pollService } from "../../engagement/pollService.js";
 import { broadcastAlert } from "../../api/alertEvents.js";
 
@@ -29,7 +34,7 @@ export const handleGiveaway: CommandHandler = async (parsed, ctx) => {
     }
     await sendMessage(
       ctx.broadcasterId,
-      `🎁 Sorteio aberto: ${open.prize} | Entradas: ${open.entries.length} | Custo: ${open.costPoints} ponto(s). Use !entrar`
+      `🎁 Sorteio aberto: ${open.prize} | Entradas: ${open.entries.length} | ${describeEntryInstructions(open)}`
     );
     return;
   }
@@ -54,14 +59,14 @@ export const handleGiveaway: CommandHandler = async (parsed, ctx) => {
 
     await sendMessage(
       ctx.broadcasterId,
-      `🎉 Vencedor do sorteio (${result.prize}): @${result.winner.username} entre ${result.entries} entrada(s)!`
+      `🎉 Vencedor do sorteio (${result.prize}): @${result.winner.username} entre ${result.tickets} entrada(s)!`
     );
     broadcastAlert({
       type: "giveaway_winner",
       channelSlug: ctx.channelSlug,
       title: "Sorteio encerrado",
       message: `@${result.winner.username} venceu: ${result.prize}`,
-      metadata: { entries: result.entries, giveawayId: result.giveawayId },
+      metadata: { entries: result.tickets, giveawayId: result.giveawayId },
     });
     return;
   }
@@ -95,24 +100,30 @@ export const handleGiveaway: CommandHandler = async (parsed, ctx) => {
   }
 
   try {
-    const giveaway = await giveawayService.create(
-      ctx.channelSlug,
+    const giveaway = await giveawayService.create(ctx.channelSlug, {
       prize,
-      "everyone",
-      costPoints
-    );
+      filterType: "everyone",
+      costPoints,
+      weightedSubs: false,
+      entryMode: "command",
+      entryCommand: "entrar",
+    });
     await sendMessage(
       ctx.broadcasterId,
-      `🎁 Sorteio iniciado! Prêmio: ${giveaway.prize}. Para participar use !entrar${
-        giveaway.costPoints > 0 ? ` (custo ${giveaway.costPoints} ponto(s))` : ""
-      }`
+      `🎁 Sorteio iniciado! Prêmio: ${giveaway.prize}. ${describeEntryInstructions(giveaway)}`
     );
     broadcastAlert({
       type: "giveaway_open",
       channelSlug: ctx.channelSlug,
       title: "Novo sorteio aberto",
       message: `Prêmio: ${giveaway.prize}`,
-      metadata: { giveawayId: giveaway.id, costPoints: giveaway.costPoints },
+      metadata: {
+        giveawayId: giveaway.id,
+        costPoints: giveaway.costPoints,
+        weightedSubs: giveaway.weightedSubs,
+        entryMode: giveaway.entryMode,
+        entryCommand: giveaway.entryCommand,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -120,13 +131,33 @@ export const handleGiveaway: CommandHandler = async (parsed, ctx) => {
   }
 };
 
-export const handleGiveawayEntry: CommandHandler = async (_parsed, ctx) => {
-  const result = await giveawayService.enterOpen(ctx.channelSlug, {
-    kickUserId: ctx.message.sender.id,
-    username: ctx.message.sender.username,
-    slug: ctx.message.sender.slug,
-    badges: ctx.message.sender.identity.badges,
-  });
+export const handleGiveawayEntry: CommandHandler = async (parsed, ctx) => {
+  const open = await giveawayService.getOpen(ctx.channelSlug);
+  if (open && normalizeEntryMode(open.entryMode) === "chat") {
+    // Entrada já é tratada por tryEnterFromChat em qualquer mensagem
+    return;
+  }
+  if (open && normalizeEntryMode(open.entryMode) === "command") {
+    const expected = normalizeEntryCommand(open.entryCommand);
+    if (parsed.command.toLowerCase() !== expected) {
+      await sendMessage(
+        ctx.broadcasterId,
+        `@${ctx.message.sender.username} use !${expected} para entrar neste sorteio.`
+      );
+      return;
+    }
+  }
+
+  const result = await giveawayService.enterOpen(
+    ctx.channelSlug,
+    {
+      kickUserId: ctx.message.sender.id,
+      username: ctx.message.sender.username,
+      slug: ctx.message.sender.slug,
+      badges: ctx.message.sender.identity.badges,
+    },
+    "command"
+  );
 
   if (!result.ok) {
     await sendMessage(ctx.broadcasterId, `@${ctx.message.sender.username} ${result.error}`);
@@ -135,7 +166,9 @@ export const handleGiveawayEntry: CommandHandler = async (_parsed, ctx) => {
 
   await sendMessage(
     ctx.broadcasterId,
-    `@${ctx.message.sender.username} entrada confirmada! Total atual: ${result.entries} participante(s).`
+    `@${ctx.message.sender.username} entrada confirmada${
+      result.entryWeight > 1 ? ` (${result.entryWeight}x)` : ""
+    }! Total: ${result.participants} participante(s) · ${result.tickets} entrada(s).`
   );
 };
 

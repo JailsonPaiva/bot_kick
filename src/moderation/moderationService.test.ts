@@ -3,6 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 import {
   __resetModerationStateForTests,
   checkModeration,
+  clampTimeoutDurationMinutes,
 } from "./moderationService.js";
 import type { ChatMessage } from "../chat/types.js";
 
@@ -26,6 +27,27 @@ function makeMessage(
   };
 }
 
+const baseConfig = {
+  linksEnabled: false,
+  linksWhitelist: [] as string[],
+  capsEnabled: false,
+  capsPercent: 70,
+  spamEnabled: false,
+  spamWindow: 3,
+  bannedWords: [] as string[],
+  actionType: "warn",
+  timeoutDurationMinutes: 1,
+};
+
+describe("clampTimeoutDurationMinutes", () => {
+  it("aceita valores válidos e limita extremos", () => {
+    assert.equal(clampTimeoutDurationMinutes(5), 5);
+    assert.equal(clampTimeoutDurationMinutes(0), 1);
+    assert.equal(clampTimeoutDurationMinutes(20_000), 10_080);
+    assert.equal(clampTimeoutDurationMinutes("abc"), 1);
+  });
+});
+
 describe("moderationService", () => {
   beforeEach(() => {
     __resetModerationStateForTests();
@@ -47,14 +69,13 @@ describe("moderationService", () => {
       10,
       {
         getConfig: async () => ({
+          ...baseConfig,
           linksEnabled: true,
-          linksWhitelist: [],
           capsEnabled: true,
           capsPercent: 10,
           spamEnabled: true,
           spamWindow: 1,
           bannedWords: ["spam"],
-          actionType: "warn",
         }),
         logViolation: async () => {
           throw new Error("não deveria logar");
@@ -77,14 +98,9 @@ describe("moderationService", () => {
       10,
       {
         getConfig: async () => ({
+          ...baseConfig,
           linksEnabled: true,
           linksWhitelist: ["kick.com"],
-          capsEnabled: false,
-          capsPercent: 70,
-          spamEnabled: false,
-          spamWindow: 3,
-          bannedWords: [],
-          actionType: "warn",
         }),
         logViolation: async (_channel, _msg, reason) => {
           logs.push(reason);
@@ -104,14 +120,9 @@ describe("moderationService", () => {
   it("detecta spam por repetição em sequência", async () => {
     const deps = {
       getConfig: async () => ({
-        linksEnabled: false,
-        linksWhitelist: [],
-        capsEnabled: false,
-        capsPercent: 70,
+        ...baseConfig,
         spamEnabled: true,
         spamWindow: 2,
-        bannedWords: [],
-        actionType: "warn",
       }),
       logViolation: async () => {},
       send: async () => {},
@@ -125,5 +136,31 @@ describe("moderationService", () => {
     assert.equal(second.blocked, false);
     assert.equal(third.blocked, true);
     assert.equal(third.reason, "spam detectado");
+  });
+
+  it("aplica timeout com duração configurada", async () => {
+    const timeouts: Array<{ userId: number; minutes: number }> = [];
+
+    const result = await checkModeration(
+      makeMessage("palavra-ruim aqui"),
+      "canal",
+      10,
+      {
+        getConfig: async () => ({
+          ...baseConfig,
+          bannedWords: ["palavra-ruim"],
+          actionType: "timeout",
+          timeoutDurationMinutes: 10,
+        }),
+        logViolation: async () => {},
+        send: async () => {},
+        applyTimeout: async (_bc, userId, minutes) => {
+          timeouts.push({ userId, minutes });
+        },
+      }
+    );
+
+    assert.equal(result.blocked, true);
+    assert.deepEqual(timeouts, [{ userId: 99, minutes: 10 }]);
   });
 });

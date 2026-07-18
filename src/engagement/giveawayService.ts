@@ -5,6 +5,8 @@
 import { randomInt } from "node:crypto";
 import { prisma } from "../infra/prisma/client.js";
 
+export type GiveawayEntryMode = "command" | "chat";
+
 export interface GiveawayUser {
   kickUserId: number;
   username: string;
@@ -12,40 +14,155 @@ export interface GiveawayUser {
   badges: Array<{ type: string; text: string }>;
 }
 
+export interface CreateGiveawayOptions {
+  prize: string;
+  filterType?: string;
+  costPoints?: number;
+  weightedSubs?: boolean;
+  entryMode?: GiveawayEntryMode;
+  entryCommand?: string;
+  entryDurationSeconds?: number;
+}
+
+const MIN_CHAT_ENTRY_SECONDS = 15;
+const MAX_CHAT_ENTRY_SECONDS = 3600;
+const DEFAULT_CHAT_ENTRY_SECONDS = 60;
+
 function normalizeFilter(filterType: string): string {
   const value = filterType.toLowerCase();
   if (value === "subscribers" || value === "followers" || value === "both") return value;
   return "everyone";
 }
 
-function canEnter(filterType: string, badges: GiveawayUser["badges"]): boolean {
-  if (filterType === "everyone" || filterType === "followers") return true;
-  const isSub = badges.some((b) => {
+export function normalizeEntryMode(value: unknown): GiveawayEntryMode {
+  return value === "chat" ? "chat" : "command";
+}
+
+export function normalizeEntryCommand(value: unknown): string {
+  const raw = String(value ?? "entrar")
+    .trim()
+    .toLowerCase()
+    .replace(/^!+/, "")
+    .replace(/[^a-z0-9_-]/g, "");
+  return raw || "entrar";
+}
+
+export function clampEntryDurationSeconds(value: unknown): number {
+  const n =
+    typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return DEFAULT_CHAT_ENTRY_SECONDS;
+  }
+  return Math.min(MAX_CHAT_ENTRY_SECONDS, Math.max(MIN_CHAT_ENTRY_SECONDS, n));
+}
+
+export function hasSubscriberBadge(badges: GiveawayUser["badges"]): boolean {
+  return badges.some((b) => {
     const t = b.type.toLowerCase();
     return t === "subscriber" || t === "broadcaster";
   });
+}
+
+function canEnter(filterType: string, badges: GiveawayUser["badges"]): boolean {
+  if (filterType === "everyone" || filterType === "followers") return true;
+  const isSub = hasSubscriberBadge(badges);
   if (filterType === "subscribers" || filterType === "both") return isSub;
   return true;
 }
 
+export function resolveEntryWeight(
+  weightedSubs: boolean,
+  badges: GiveawayUser["badges"]
+): number {
+  return weightedSubs && hasSubscriberBadge(badges) ? 2 : 1;
+}
+
+export function isEntryWindowOpen(giveaway: {
+  entryMode: string;
+  entryEndsAt: Date | null;
+}, now = new Date()): boolean {
+  if (normalizeEntryMode(giveaway.entryMode) !== "chat") return true;
+  if (!giveaway.entryEndsAt) return false;
+  return giveaway.entryEndsAt.getTime() > now.getTime();
+}
+
+/** Sorteio ponderado: weight 2 = duas chances */
+export function pickWeightedEntry<T extends { weight: number }>(
+  entries: readonly T[]
+): T | null {
+  if (entries.length === 0) return null;
+  const totalWeight = entries.reduce((sum, e) => sum + Math.max(1, e.weight), 0);
+  let ticket = randomInt(totalWeight);
+  for (const entry of entries) {
+    const w = Math.max(1, entry.weight);
+    if (ticket < w) return entry;
+    ticket -= w;
+  }
+  return entries[entries.length - 1] ?? null;
+}
+
+export function totalEntryTickets(
+  entries: ReadonlyArray<{ weight: number }>
+): number {
+  return entries.reduce((sum, e) => sum + Math.max(1, e.weight), 0);
+}
+
+export function describeEntryInstructions(giveaway: {
+  entryMode: string;
+  entryCommand: string;
+  entryEndsAt: Date | null;
+  costPoints: number;
+  weightedSubs: boolean;
+}): string {
+  const cost =
+    giveaway.costPoints > 0 ? ` (custo ${giveaway.costPoints} ponto(s))` : "";
+  const subs = giveaway.weightedSubs ? " · Assinantes têm 2x entradas" : "";
+  if (normalizeEntryMode(giveaway.entryMode) === "chat") {
+    const ends = giveaway.entryEndsAt
+      ? ` até ${giveaway.entryEndsAt.toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })}`
+      : "";
+    return `Digite qualquer mensagem no chat${ends} para participar${cost}${subs}`;
+  }
+  return `Para participar use !${normalizeEntryCommand(giveaway.entryCommand)}${cost}${subs}`;
+}
+
 export class GiveawayService {
-  async create(
-    channelSlug: string,
-    prize: string,
-    filterType = "everyone",
-    costPoints = 0
-  ) {
+  async create(channelSlug: string, options: CreateGiveawayOptions) {
     const existing = await this.getOpen(channelSlug);
     if (existing) {
       throw new Error("Já existe um sorteio aberto neste canal.");
     }
 
+    const prize = options.prize.trim();
+    if (!prize) {
+      throw new Error("Prêmio inválido para sorteio.");
+    }
+
+    const entryMode = normalizeEntryMode(options.entryMode);
+    const entryCommand = normalizeEntryCommand(options.entryCommand);
+    const entryDurationSeconds = clampEntryDurationSeconds(
+      options.entryDurationSeconds
+    );
+    const entryEndsAt =
+      entryMode === "chat"
+        ? new Date(Date.now() + entryDurationSeconds * 1000)
+        : null;
+
     return prisma.giveaway.create({
       data: {
         channelSlug,
         prize,
-        filterType: normalizeFilter(filterType),
-        costPoints: Math.max(0, Math.floor(costPoints)),
+        filterType: normalizeFilter(options.filterType ?? "everyone"),
+        costPoints: Math.max(0, Math.floor(options.costPoints ?? 0)),
+        weightedSubs: Boolean(options.weightedSubs),
+        entryMode,
+        entryCommand,
+        entryDurationSeconds,
+        entryEndsAt,
         status: "open",
       },
     });
@@ -68,13 +185,49 @@ export class GiveawayService {
     });
   }
 
-  async enterOpen(channelSlug: string, user: GiveawayUser): Promise<{ ok: true; entries: number } | { ok: false; error: string }> {
+  async enterOpen(
+    channelSlug: string,
+    user: GiveawayUser,
+    source: "command" | "chat" = "command"
+  ): Promise<
+    | { ok: true; participants: number; entryWeight: number; tickets: number }
+    | { ok: false; error: string; silent?: boolean }
+  > {
     const giveaway = await this.getOpen(channelSlug);
-    if (!giveaway) return { ok: false, error: "Nenhum sorteio aberto no momento." };
+    if (!giveaway) {
+      return { ok: false, error: "Nenhum sorteio aberto no momento.", silent: source === "chat" };
+    }
+
+    const mode = normalizeEntryMode(giveaway.entryMode);
+
+    if (source === "command" && mode === "chat") {
+      return {
+        ok: false,
+        error: "Este sorteio aceita entrada apenas digitando no chat durante o período.",
+      };
+    }
+
+    if (source === "chat" && mode !== "chat") {
+      return { ok: false, error: "Entrada por chat desativada.", silent: true };
+    }
+
+    if (mode === "chat" && !isEntryWindowOpen(giveaway)) {
+      return {
+        ok: false,
+        error: "O período de entrada deste sorteio já encerrou.",
+        silent: source === "chat",
+      };
+    }
 
     if (!canEnter(giveaway.filterType, user.badges)) {
-      return { ok: false, error: "Você não atende aos requisitos deste sorteio." };
+      return {
+        ok: false,
+        error: "Você não atende aos requisitos deste sorteio.",
+        silent: source === "chat",
+      };
     }
+
+    const entryWeight = resolveEntryWeight(giveaway.weightedSubs, user.badges);
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -114,27 +267,55 @@ export class GiveawayService {
             kickUserId: BigInt(user.kickUserId),
             username: user.username,
             slug: user.slug,
+            weight: entryWeight,
           },
         });
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("Unique constraint")) {
-        return { ok: false, error: "Você já está participando deste sorteio." };
+        return {
+          ok: false,
+          error: "Você já está participando deste sorteio.",
+          silent: source === "chat",
+        };
       }
-      return { ok: false, error: message };
+      return { ok: false, error: message, silent: source === "chat" };
     }
 
-    const entriesCount = await prisma.giveawayEntry.count({
+    const entries = await prisma.giveawayEntry.findMany({
       where: { giveawayId: giveaway.id },
+      select: { weight: true },
     });
 
-    return { ok: true, entries: entriesCount };
+    return {
+      ok: true,
+      participants: entries.length,
+      entryWeight,
+      tickets: totalEntryTickets(entries),
+    };
+  }
+
+  /** Entrada silenciosa por mensagem no chat (modo período). */
+  async tryEnterFromChat(
+    channelSlug: string,
+    user: GiveawayUser
+  ): Promise<{ entered: boolean; entryWeight?: number }> {
+    const result = await this.enterOpen(channelSlug, user, "chat");
+    if (!result.ok) return { entered: false };
+    return { entered: true, entryWeight: result.entryWeight };
   }
 
   async draw(channelSlug: string): Promise<
     | { ok: false; error: string }
-    | { ok: true; winner: { kickUserId: number; username: string } | null; giveawayId: string; entries: number; prize: string }
+    | {
+        ok: true;
+        winner: { kickUserId: number; username: string } | null;
+        giveawayId: string;
+        entries: number;
+        tickets: number;
+        prize: string;
+      }
   > {
     const giveaway = await this.getOpen(channelSlug);
     if (!giveaway) return { ok: false, error: "Nenhum sorteio aberto para encerrar." };
@@ -154,11 +335,13 @@ export class GiveawayService {
         winner: null,
         giveawayId: giveaway.id,
         entries: 0,
+        tickets: 0,
         prize: giveaway.prize,
       };
     }
 
-    const winner = entries[randomInt(entries.length)]!;
+    const winner = pickWeightedEntry(entries)!;
+    const tickets = totalEntryTickets(entries);
 
     await prisma.giveaway.update({
       where: { id: giveaway.id },
@@ -171,16 +354,25 @@ export class GiveawayService {
 
     return {
       ok: true,
-      winner: { kickUserId: Number(winner.kickUserId), username: winner.username },
+      winner: {
+        kickUserId: Number(winner.kickUserId),
+        username: winner.username,
+      },
       giveawayId: giveaway.id,
       entries: entries.length,
+      tickets,
       prize: giveaway.prize,
     };
   }
 
   async reroll(channelSlug: string): Promise<
     | { ok: false; error: string }
-    | { ok: true; winner: { kickUserId: number; username: string }; giveawayId: string; prize: string }
+    | {
+        ok: true;
+        winner: { kickUserId: number; username: string };
+        giveawayId: string;
+        prize: string;
+      }
   > {
     const giveaway = await prisma.giveaway.findFirst({
       where: { channelSlug, status: "closed" },
@@ -201,7 +393,7 @@ export class GiveawayService {
       return { ok: false, error: "Não há participantes suficientes para reroll." };
     }
 
-    const winner = entries[randomInt(entries.length)]!;
+    const winner = pickWeightedEntry(entries)!;
 
     await prisma.giveaway.update({
       where: { id: giveaway.id },
@@ -210,7 +402,10 @@ export class GiveawayService {
 
     return {
       ok: true,
-      winner: { kickUserId: Number(winner.kickUserId), username: winner.username },
+      winner: {
+        kickUserId: Number(winner.kickUserId),
+        username: winner.username,
+      },
       giveawayId: giveaway.id,
       prize: giveaway.prize,
     };

@@ -211,6 +211,13 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
           spamWindow: { type: "integer" },
           bannedWords: { type: "array", items: { type: "string" } },
           actionType: { type: "string", example: "warn" },
+          timeoutDurationMinutes: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10080,
+            default: 1,
+            description: "Duração do timeout em minutos (quando actionType=timeout)",
+          },
         },
       },
       PlayMoveRequest: {
@@ -226,8 +233,36 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
         properties: {
           channelSlug: { type: "string" },
           prize: { type: "string" },
-          filterType: { type: "string", enum: ["everyone", "subs", "followers"], default: "everyone" },
+          filterType: {
+            type: "string",
+            enum: ["everyone", "subscribers", "followers", "both"],
+            default: "everyone",
+          },
           costPoints: { type: "integer", default: 0 },
+          weightedSubs: {
+            type: "boolean",
+            default: false,
+            description: "Assinantes recebem 2 entradas no sorteio",
+          },
+          entryMode: {
+            type: "string",
+            enum: ["command", "chat"],
+            default: "command",
+            description:
+              "command = entrada via !comando; chat = digitar qualquer mensagem no período",
+          },
+          entryCommand: {
+            type: "string",
+            default: "entrar",
+            description: "Comando sem ! (quando entryMode=command)",
+          },
+          entryDurationSeconds: {
+            type: "integer",
+            minimum: 15,
+            maximum: 3600,
+            default: 60,
+            description: "Duração do período de entrada (quando entryMode=chat)",
+          },
         },
       },
       PollCreate: {

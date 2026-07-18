@@ -12,6 +12,7 @@ import { createGameServices, setupGameServices } from "./games/index.js";
 import { timerService } from "./timers/timerService.js";
 import { checkModeration } from "./moderation/moderationService.js";
 import { loyaltyService } from "./loyalty/loyaltyService.js";
+import { giveawayService } from "./engagement/giveawayService.js";
 import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
@@ -54,6 +55,16 @@ async function main(): Promise<void> {
       // Fase 2 — moderação antes do roteamento
       const modResult = await checkModeration(msg, channelSlug, broadcasterId);
       if (modResult.blocked) return;
+
+      // Sorteio modo chat: qualquer mensagem no período conta como entrada
+      if (msg.sender.slug.toLowerCase() !== botSlug.toLowerCase()) {
+        await giveawayService.tryEnterFromChat(channelSlug, {
+          kickUserId: msg.sender.id,
+          username: msg.sender.username,
+          slug: msg.sender.slug,
+          badges: msg.sender.identity.badges,
+        });
+      }
 
       await router.dispatch(msg, {
         message: msg,

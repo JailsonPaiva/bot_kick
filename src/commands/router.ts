@@ -10,6 +10,12 @@ import { isSystemCommandActive } from "./systemCommandConfigService.js";
 import { isKnownSystemCommand } from "./systemCommandsCatalog.js";
 import type { CommandContext, CommandHandler, ParsedCommand } from "./types.js";
 import { tryExecuteCustomCommand } from "./customCommands.js";
+import {
+  giveawayService,
+  normalizeEntryCommand,
+  normalizeEntryMode,
+} from "../engagement/giveawayService.js";
+import { handleGiveawayEntry } from "./handlers/engagementHandlers.js";
 
 export class CommandRouter {
   private handlers = new Map<string, CommandHandler>();
@@ -35,6 +41,22 @@ export class CommandRouter {
     }
 
     logger.info(`[CHAT] ${message.sender.username}: ${content}`);
+
+    // Comando de entrada customizado do sorteio ativo (!join, etc.)
+    const openGiveaway = await giveawayService.getOpen(ctx.channelSlug);
+    if (
+      openGiveaway &&
+      normalizeEntryMode(openGiveaway.entryMode) === "command" &&
+      parsed.command === normalizeEntryCommand(openGiveaway.entryCommand) &&
+      !this.handlers.has(parsed.command)
+    ) {
+      try {
+        await handleGiveawayEntry(parsed, ctx);
+      } catch (err) {
+        logger.error(`Erro ao processar entrada do sorteio "${content}"`, err);
+      }
+      return;
+    }
 
     const handler = this.handlers.get(parsed.command);
     if (handler) {

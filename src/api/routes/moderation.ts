@@ -5,7 +5,10 @@
 import { Router } from "express";
 import { prisma } from "../../infra/prisma/client.js";
 import { authMiddleware } from "../auth.js";
-import { invalidateModerationCache } from "../../moderation/moderationService.js";
+import {
+  clampTimeoutDurationMinutes,
+  invalidateModerationCache,
+} from "../../moderation/moderationService.js";
 import type { ApiResponse } from "../types.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
@@ -33,6 +36,7 @@ export function createModerationRouter(): Router {
             spamWindow: 5,
             bannedWords: [],
             actionType: "warn",
+            timeoutDurationMinutes: 1,
           },
         } satisfies ApiResponse);
         return;
@@ -55,6 +59,7 @@ export function createModerationRouter(): Router {
       spamWindow,
       bannedWords,
       actionType,
+      timeoutDurationMinutes,
     } = req.body as {
       linksEnabled?: boolean;
       linksWhitelist?: string[];
@@ -64,7 +69,27 @@ export function createModerationRouter(): Router {
       spamWindow?: number;
       bannedWords?: string[];
       actionType?: string;
+      timeoutDurationMinutes?: number;
     };
+
+    if (
+      timeoutDurationMinutes !== undefined &&
+      (typeof timeoutDurationMinutes !== "number" ||
+        !Number.isInteger(timeoutDurationMinutes) ||
+        timeoutDurationMinutes < 1 ||
+        timeoutDurationMinutes > 10_080)
+    ) {
+      res.status(400).json({
+        success: false,
+        error: "timeoutDurationMinutes deve ser um inteiro entre 1 e 10080",
+      });
+      return;
+    }
+
+    const timeoutMinutes =
+      timeoutDurationMinutes !== undefined
+        ? clampTimeoutDurationMinutes(timeoutDurationMinutes)
+        : undefined;
 
     try {
       const config = await prisma.moderationConfig.upsert({
@@ -79,6 +104,7 @@ export function createModerationRouter(): Router {
           spamWindow: spamWindow ?? 5,
           bannedWords: bannedWords ?? [],
           actionType: actionType ?? "warn",
+          timeoutDurationMinutes: timeoutMinutes ?? 1,
         },
         update: {
           ...(linksEnabled !== undefined && { linksEnabled }),
@@ -89,6 +115,9 @@ export function createModerationRouter(): Router {
           ...(spamWindow !== undefined && { spamWindow }),
           ...(bannedWords !== undefined && { bannedWords }),
           ...(actionType !== undefined && { actionType }),
+          ...(timeoutMinutes !== undefined && {
+            timeoutDurationMinutes: timeoutMinutes,
+          }),
         },
       });
 

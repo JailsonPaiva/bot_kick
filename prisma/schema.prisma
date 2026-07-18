@@ -104,6 +104,7 @@ model ModerationConfig {
   spamWindow     Int      @default(5)
   bannedWords    String[]
   actionType     String   @default("warn")
+  timeoutDurationMinutes Int @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -205,6 +206,11 @@ model Giveaway {
   prize            String
   filterType       String          @default("everyone")
   costPoints       Int             @default(0)
+  weightedSubs     Boolean         @default(false)
+  entryMode        String          @default("command")
+  entryCommand     String          @default("entrar")
+  entryDurationSeconds Int         @default(60)
+  entryEndsAt      DateTime?
   status           String          @default("open")
   winnerKickUserId BigInt?
   createdAt        DateTime        @default(now())
@@ -220,6 +226,7 @@ model GiveawayEntry {
   kickUserId BigInt
   username   String
   slug       String
+  weight     Int      @default(1)
   createdAt  DateTime @default(now())
   giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
 

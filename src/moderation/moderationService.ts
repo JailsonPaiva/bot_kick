@@ -10,6 +10,7 @@
 
 import { prisma } from "../infra/prisma/client.js";
 import { sendMessage } from "../chat/chatSender.js";
+import { banKickUser, deleteKickChatMessage } from "../kick/chatModerationApi.js";
 import { logger } from "../utils/logger.js";
 import type { ChatMessage } from "../chat/types.js";
 
@@ -17,7 +18,8 @@ export interface ModerationResult {
   blocked: boolean;
   reason?: string;
 }
-interface ModerationConfigEntity {
+
+export interface ModerationConfigEntity {
   linksEnabled: boolean;
   linksWhitelist: string[];
   capsEnabled: boolean;
@@ -26,7 +28,9 @@ interface ModerationConfigEntity {
   spamWindow: number;
   bannedWords: string[];
   actionType: string;
+  timeoutDurationMinutes: number;
 }
+
 interface ModerationDeps {
   getConfig: (channelSlug: string) => Promise<ModerationConfigEntity | null>;
   logViolation: (
@@ -36,6 +40,13 @@ interface ModerationDeps {
     action: string
   ) => Promise<void>;
   send: (broadcasterId: number, content: string) => Promise<void>;
+  applyTimeout?: (
+    broadcasterId: number,
+    userId: number,
+    durationMinutes: number,
+    reason: string
+  ) => Promise<void>;
+  deleteMessage?: (messageId: string) => Promise<void>;
 }
 
 /** Cache do config por canal para evitar query por mensagem */
@@ -54,6 +65,19 @@ const SPAM_HISTORY = 3;
 
 /** URL regex simples */
 const URL_REGEX = /https?:\/\/[^\s]+|www\.[^\s]+|\b\w+\.\w{2,}\/\S*/gi;
+
+const DEFAULT_TIMEOUT_MINUTES = 1;
+const MIN_TIMEOUT_MINUTES = 1;
+const MAX_TIMEOUT_MINUTES = 10_080; // 7 dias
+
+export function clampTimeoutDurationMinutes(value: unknown): number {
+  const n =
+    typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return DEFAULT_TIMEOUT_MINUTES;
+  }
+  return Math.min(MAX_TIMEOUT_MINUTES, Math.max(MIN_TIMEOUT_MINUTES, n));
+}
 
 async function loadConfig(channelSlug: string) {
   return prisma.moderationConfig.findUnique({ where: { channelSlug } });
@@ -141,10 +165,20 @@ async function logViolation(
     },
   });
 }
+
 const defaultDeps: ModerationDeps = {
   getConfig,
   logViolation,
   send: sendMessage,
+  applyTimeout: async (broadcasterId, userId, durationMinutes, reason) => {
+    await banKickUser({
+      broadcasterUserId: broadcasterId,
+      userId,
+      durationMinutes,
+      reason,
+    });
+  },
+  deleteMessage: deleteKickChatMessage,
 };
 
 export async function checkModeration(
@@ -177,16 +211,53 @@ export async function checkModeration(
   if (!reason) return { blocked: false };
 
   const action = config.actionType;
-  logger.warn(
-    `[MOD] ${msg.sender.username} — ${reason} (ação: ${action})`
+  const timeoutMinutes = clampTimeoutDurationMinutes(
+    config.timeoutDurationMinutes ?? DEFAULT_TIMEOUT_MINUTES
   );
 
-  void deps.logViolation(channelSlug, msg, reason, action);
+  logger.warn(
+    `[MOD] ${msg.sender.username} — ${reason} (ação: ${action}${
+      action === "timeout" ? `, ${timeoutMinutes}min` : ""
+    })`
+  );
+
+  void deps.logViolation(
+    channelSlug,
+    msg,
+    reason,
+    action === "timeout" ? `timeout:${timeoutMinutes}m` : action
+  );
+
+  if (action === "delete" && deps.deleteMessage) {
+    try {
+      await deps.deleteMessage(msg.id);
+    } catch (err) {
+      logger.error(`[MOD] Falha ao deletar mensagem ${msg.id}`, err);
+    }
+  }
+
+  if (action === "timeout" && deps.applyTimeout) {
+    try {
+      await deps.applyTimeout(
+        broadcasterId,
+        msg.sender.id,
+        timeoutMinutes,
+        reason
+      );
+    } catch (err) {
+      logger.error(
+        `[MOD] Falha ao aplicar timeout em ${msg.sender.username}`,
+        err
+      );
+    }
+  }
 
   if (action === "warn" || action === "timeout" || action === "ban") {
+    const timeoutHint =
+      action === "timeout" ? ` Timeout: ${timeoutMinutes} min.` : "";
     await deps.send(
       broadcasterId,
-      `@${msg.sender.username} ⚠️ Mensagem removida: ${reason}.`
+      `@${msg.sender.username} ⚠️ Mensagem removida: ${reason}.${timeoutHint}`
     );
   }
 
