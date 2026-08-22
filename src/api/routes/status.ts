@@ -10,6 +10,7 @@ import { collectDeepHealth } from "../../ops/deepHealth.js";
 import { APP_VERSION } from "../../ops/appVersion.js";
 import { getStartedAt, metrics } from "../../ops/metrics.js";
 import { evaluateSlos } from "../../ops/slo.js";
+import { fetchChannelLiveStatus } from "../../kick/fetchChannelLiveStatus.js";
 
 export function createStatusRouter(
   gameManager: GameManager,
@@ -24,11 +25,20 @@ export function createStatusRouter(
 
     const players = await playerRepository.getTopN(10000);
     const health = await collectDeepHealth();
+    const channelSlug = process.env.KICK_CHANNEL_SLUG ?? "";
+    const liveStatus = await fetchChannelLiveStatus(channelSlug);
+    const botOnline = health.dependencies.websocket.status !== "down";
 
     const response: ApiResponse<BotStatusResponse> = {
       success: true,
       data: {
-        online: health.dependencies.websocket.status !== "down",
+        online: liveStatus.live,
+        botOnline,
+        live: liveStatus.live,
+        viewerCount: liveStatus.viewerCount,
+        subscriberCount: liveStatus.subscriberCount,
+        liveDurationSeconds: liveStatus.liveDurationSeconds,
+        streamTitle: liveStatus.streamTitle,
         uptime: Date.now() - getStartedAt(),
         activeGames,
         totalPlayers: players.length,

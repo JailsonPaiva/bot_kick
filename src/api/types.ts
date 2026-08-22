@@ -19,6 +19,12 @@ export interface ApiResponse<T = unknown> {
 
 export interface BotStatusResponse {
   online: boolean;
+  botOnline: boolean;
+  live: boolean;
+  viewerCount: number;
+  subscriberCount: number;
+  liveDurationSeconds: number;
+  streamTitle: string | null;
   uptime: number;
   activeGames: number;
   totalPlayers: number;

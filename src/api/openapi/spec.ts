@@ -117,7 +117,19 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
       BotStatus: {
         type: "object",
         properties: {
-          online: { type: "boolean" },
+          online: {
+            type: "boolean",
+            description: "Canal em live na Kick",
+          },
+          botOnline: {
+            type: "boolean",
+            description: "Bot/WebSocket conectado ao chat",
+          },
+          live: { type: "boolean" },
+          viewerCount: { type: "integer" },
+          subscriberCount: { type: "integer" },
+          liveDurationSeconds: { type: "integer" },
+          streamTitle: { type: "string", nullable: true },
           uptime: { type: "number", description: "Uptime em ms" },
           activeGames: { type: "integer" },
           totalPlayers: { type: "integer" },

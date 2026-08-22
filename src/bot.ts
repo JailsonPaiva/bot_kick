@@ -14,12 +14,31 @@ import { checkModeration } from "./moderation/moderationService.js";
 import { loyaltyService } from "./loyalty/loyaltyService.js";
 import { giveawayService } from "./engagement/giveawayService.js";
 import { startApiServer } from "./api/index.js";
+import { broadcastChatMessage } from "./api/chatEvents.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 import { connectRedis } from "./infra/redis/redisClient.js";
 import { isModuleEnabled } from "./ops/featureFlags.js";
 import { metrics } from "./ops/metrics.js";
 import { eventQueue } from "./ops/eventQueue.js";
+
+function relayWsMessageToDashboard(channelSlug: string, msg: ChatMessage): void {
+  broadcastChatMessage(channelSlug, {
+    id: msg.id,
+    content: msg.content ?? "",
+    createdAt: msg.created_at,
+    channelSlug,
+    sender: {
+      userId: msg.sender.id,
+      username: msg.sender.username,
+      color: msg.sender.identity.color,
+      badges: (msg.sender.identity.badges ?? []).map((badge) => ({
+        type: badge.type,
+        text: badge.text,
+      })),
+    },
+  });
+}
 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
@@ -62,6 +81,11 @@ async function main(): Promise<void> {
 
   listener.on("message", (msg: ChatMessage) => {
     void (async () => {
+      // Fallback de chat ao vivo: se webhook não chegar, o dashboard ainda recebe via WS do bot
+      if (isModuleEnabled(channelSlug, "chat")) {
+        relayWsMessageToDashboard(channelSlug, msg);
+      }
+
       if (isModuleEnabled(channelSlug, "loyalty")) {
         await loyaltyService.trackChatActivity(channelSlug, msg);
       }
