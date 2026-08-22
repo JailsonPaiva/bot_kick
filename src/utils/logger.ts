@@ -1,9 +1,15 @@
 /**
- * Logger simples com timestamp e nível de severidade.
- * Usado em todo o projeto para rastrear fluxos OAuth, WebSocket e chat.
+ * Logger estruturado (JSON) com requestId, channelSlug, módulo e severity.
  */
 
-type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+export interface LogContext {
+  requestId?: string;
+  channelSlug?: string;
+  module?: string;
+  [key: string]: unknown;
+}
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
@@ -19,35 +25,48 @@ function shouldLog(level: LogLevel): boolean {
   return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[MIN_LEVEL];
 }
 
-function formatTimestamp(): string {
-  return new Date().toISOString();
-}
-
-function formatError(error: unknown): string {
+function formatError(error: unknown): { message: string; stack?: string } {
   if (error instanceof Error) {
-    return error.message;
+    return { message: error.message, stack: error.stack };
   }
-  return String(error);
+  return { message: String(error) };
 }
 
-function log(level: LogLevel, message: string, error?: unknown): void {
+function isLogContext(value: unknown): value is LogContext {
+  return Boolean(value) && typeof value === "object" && !(value instanceof Error);
+}
+
+function emit(level: LogLevel, message: string, extra?: unknown, error?: unknown): void {
   if (!shouldLog(level)) return;
 
-  const prefix = `[${formatTimestamp()}] [${level.toUpperCase()}]`;
-  if (error !== undefined) {
-    console.error(`${prefix} ${message} — ${formatError(error)}`);
-  } else if (level === "error") {
-    console.error(`${prefix} ${message}`);
+  const ctx = isLogContext(extra) ? extra : undefined;
+  const err = extra instanceof Error ? extra : error;
+
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    message,
+    ...(ctx ?? {}),
+    ...(err !== undefined ? { error: formatError(err) } : {}),
+  };
+
+  const line = JSON.stringify(payload);
+  if (level === "error") {
+    console.error(line);
   } else if (level === "warn") {
-    console.warn(`${prefix} ${message}`);
+    console.warn(line);
   } else {
-    console.log(`${prefix} ${message}`);
+    console.log(line);
   }
 }
 
 export const logger = {
-  debug: (message: string, error?: unknown) => log("debug", message, error),
-  info: (message: string, error?: unknown) => log("info", message, error),
-  warn: (message: string, error?: unknown) => log("warn", message, error),
-  error: (message: string, error?: unknown) => log("error", message, error),
+  debug: (message: string, extra?: unknown, error?: unknown) =>
+    emit("debug", message, extra, error),
+  info: (message: string, extra?: unknown, error?: unknown) =>
+    emit("info", message, extra, error),
+  warn: (message: string, extra?: unknown, error?: unknown) =>
+    emit("warn", message, extra, error),
+  error: (message: string, extra?: unknown, error?: unknown) =>
+    emit("error", message, extra, error),
 };

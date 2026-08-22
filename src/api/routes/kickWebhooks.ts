@@ -14,6 +14,10 @@ import { broadcastChatMessage } from "../chatEvents.js";
 import { getKickWebhookPublicKey } from "../../kick/webhookPublicKey.js";
 import { verifyKickWebhookSignature } from "../../kick/webhookSignature.js";
 import { loyaltyService } from "../../loyalty/loyaltyService.js";
+import { claimWebhookMessage } from "../../ops/webhookIdempotency.js";
+import { metrics } from "../../ops/metrics.js";
+import { withRetry } from "../../ops/retry.js";
+import { isModuleEnabled } from "../../ops/featureFlags.js";
 
 function isSkipVerifyEnabled(): boolean {
   return process.env.KICK_WEBHOOK_SKIP_VERIFY === "true";
@@ -56,14 +60,24 @@ export function createKickWebhooksRouter(): Router {
       );
 
       if (!valid) {
-        logger.warn(
-          `[WEBHOOK] Assinatura inválida type=${headers.eventType} msgId=${headers.messageId}`
-        );
+        logger.warn("Assinatura de webhook inválida", {
+          module: "webhook",
+          eventType: headers.eventType,
+          messageId: headers.messageId,
+        });
+        metrics.recordWebhook(false);
         res.status(401).json({ success: false, error: "Assinatura inválida" });
         return;
       }
     } else {
-      logger.warn("[WEBHOOK] KICK_WEBHOOK_SKIP_VERIFY=true — assinatura não verificada");
+      logger.warn("Verificação de assinatura desativada", { module: "webhook" });
+    }
+
+    const claimed = await claimWebhookMessage(headers.messageId);
+    if (!claimed) {
+      metrics.recordWebhook(true, true);
+      res.status(200).json({ success: true, ok: true, duplicate: true });
+      return;
     }
 
     const payload = parseKickWebhookPayload(rawBody);
@@ -73,29 +87,40 @@ export function createKickWebhooksRouter(): Router {
     }
 
     try {
-      const { chatMessage, loyaltyAward } = handleKickWebhookEventFull(
-        headers,
-        payload
-      );
-      if (chatMessage) {
-        broadcastChatMessage(chatMessage.channelSlug, chatMessage);
-      }
-      if (loyaltyAward) {
-        const result = await loyaltyService.awardForEvent(
-          loyaltyAward.channelSlug,
-          loyaltyAward.user,
-          loyaltyAward.eventType,
-          { isMember: loyaltyAward.isMember }
+      await withRetry(async () => {
+        const { chatMessage, loyaltyAward } = handleKickWebhookEventFull(
+          headers,
+          payload
         );
-        if (result.awarded > 0) {
-          logger.info(
-            `[WEBHOOK] loyalty awarded=${result.awarded} type=${loyaltyAward.eventType} user=${loyaltyAward.user.username}`
-          );
+        if (chatMessage && isModuleEnabled(chatMessage.channelSlug, "chat")) {
+          broadcastChatMessage(chatMessage.channelSlug, chatMessage);
         }
-      }
+        if (
+          loyaltyAward &&
+          isModuleEnabled(loyaltyAward.channelSlug, "loyalty")
+        ) {
+          const result = await loyaltyService.awardForEvent(
+            loyaltyAward.channelSlug,
+            loyaltyAward.user,
+            loyaltyAward.eventType,
+            { isMember: loyaltyAward.isMember }
+          );
+          if (result.awarded > 0) {
+            logger.info("Loyalty creditado via webhook", {
+              module: "webhook",
+              channelSlug: loyaltyAward.channelSlug,
+              awarded: result.awarded,
+              type: loyaltyAward.eventType,
+              user: loyaltyAward.user.username,
+            });
+          }
+        }
+      }, { retries: 2, baseDelayMs: 50 });
+      metrics.recordWebhook(true);
       res.status(200).json({ success: true, ok: true });
     } catch (err) {
-      logger.error("[WEBHOOK] Erro ao processar evento", err);
+      metrics.recordWebhook(false);
+      logger.error("Erro ao processar evento de webhook", { module: "webhook" }, err);
       res.status(500).json({ success: false, error: "Erro interno ao processar webhook" });
     }
   });

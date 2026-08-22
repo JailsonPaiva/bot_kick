@@ -409,6 +409,8 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
                   properties: {
                     status: { type: "string", example: "ok" },
                     timestamp: { type: "string", format: "date-time" },
+                    version: { type: "string" },
+                    dependencies: { type: "object" },
                   },
                 },
               },
@@ -441,6 +443,64 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
             },
           },
         },
+      },
+    },
+    "/api/metrics": {
+      get: {
+        tags: ["Status"],
+        summary: "Métricas in-process do piloto",
+        responses: { "200": { description: "Snapshot de métricas" } },
+      },
+    },
+    "/api/slo": {
+      get: {
+        tags: ["Status"],
+        summary: "Avaliação dos SLOs",
+        responses: { "200": { description: "SLOs atuais vs alvo" } },
+      },
+    },
+    "/api/ops/flags": {
+      get: {
+        tags: ["Ops"],
+        summary: "Feature flags do canal",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Flags" } },
+      },
+      put: {
+        tags: ["Ops"],
+        summary: "Atualizar feature flag",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Flags atualizadas" } },
+      },
+    },
+    "/api/ops/snapshots": {
+      get: {
+        tags: ["Ops"],
+        summary: "Listar snapshots de config",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Snapshots" } },
+      },
+      post: {
+        tags: ["Ops"],
+        summary: "Criar snapshot",
+        security: [{ bearerAuth: [] }],
+        responses: { "201": { description: "Snapshot criado" } },
+      },
+    },
+    "/api/ops/snapshots/{id}/restore": {
+      post: {
+        tags: ["Ops"],
+        summary: "Restaurar snapshot",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Restaurado" } },
+      },
+    },
+    "/api/ops/pilot": {
+      get: {
+        tags: ["Ops"],
+        summary: "Checklist e telemetria do piloto",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Estado do piloto" } },
       },
     },
     "/api/games": {

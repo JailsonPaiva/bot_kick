@@ -23,10 +23,12 @@ import { createPollsRouter } from "./routes/polls.js";
 import { createPublicRouter } from "./routes/public.js";
 import { createKickWebhooksRouter } from "./routes/kickWebhooks.js";
 import { createChatRouter } from "./routes/chat.js";
+import { createOpsRouter } from "./routes/ops.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
 import { initChatEvents } from "./chatEvents.js";
 import { setupSwagger } from "./swagger.js";
+import { requestContextMiddleware } from "./requestContext.js";
 
 const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
@@ -53,11 +55,7 @@ export function startApiServer(services: GameServices): {
 
   app.use(cors({ origin: CORS_ORIGIN }));
   app.use(express.json());
-
-  app.use((req, _res, next) => {
-    logger.info(`[API] ${req.method} ${req.path}`);
-    next();
-  });
+  app.use(requestContextMiddleware);
 
   // Autenticação do dashboard
   app.use("/api/auth", createAuthRouter());
@@ -90,6 +88,7 @@ export function startApiServer(services: GameServices): {
   app.use("/api", createPollsRouter());
   app.use("/api", createPublicRouter());
   app.use("/api", createChatRouter());
+  app.use("/api", createOpsRouter());
 
   setupSwagger(app);
 
@@ -103,7 +102,15 @@ export function startApiServer(services: GameServices): {
       },
       endpoints: {
         auth: ["POST /api/auth/login"],
-        status: ["GET /api/health", "GET /api/status"],
+        status: ["GET /api/health", "GET /api/status", "GET /api/metrics", "GET /api/slo"],
+        ops: [
+          "GET /api/ops/flags",
+          "PUT /api/ops/flags",
+          "GET /api/ops/snapshots",
+          "POST /api/ops/snapshots",
+          "POST /api/ops/snapshots/:id/restore",
+          "GET /api/ops/pilot",
+        ],
         games: ["GET /api/games", "DELETE /api/games/:id"],
         players: ["GET /api/players", "GET /api/players/:id"],
         play: ["GET /api/play/session", "POST /api/play/move"],

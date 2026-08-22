@@ -16,12 +16,25 @@ import { giveawayService } from "./engagement/giveawayService.js";
 import { startApiServer } from "./api/index.js";
 import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
+import { connectRedis } from "./infra/redis/redisClient.js";
+import { isModuleEnabled } from "./ops/featureFlags.js";
+import { metrics } from "./ops/metrics.js";
+import { eventQueue } from "./ops/eventQueue.js";
 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
 
   const channelSlug = requireEnv("KICK_CHANNEL_SLUG");
   const botSlug = requireEnv("KICK_BOT_SLUG");
+
+  try {
+    await connectRedis();
+    logger.info("Redis conectado", { module: "infra" });
+  } catch (err) {
+    logger.warn("Redis indisponível — piloto segue com memória local", {
+      module: "infra",
+    }, err);
+  }
 
   await ensureAuthenticated();
   logger.info("Autenticação OK");
@@ -49,15 +62,19 @@ async function main(): Promise<void> {
 
   listener.on("message", (msg: ChatMessage) => {
     void (async () => {
-      // Fase 3 — pontos por atividade no chat (janela configurável)
-      await loyaltyService.trackChatActivity(channelSlug, msg);
+      if (isModuleEnabled(channelSlug, "loyalty")) {
+        await loyaltyService.trackChatActivity(channelSlug, msg);
+      }
 
-      // Fase 2 — moderação antes do roteamento
-      const modResult = await checkModeration(msg, channelSlug, broadcasterId);
-      if (modResult.blocked) return;
+      if (isModuleEnabled(channelSlug, "moderation")) {
+        const modResult = await checkModeration(msg, channelSlug, broadcasterId);
+        if (modResult.blocked) return;
+      }
 
-      // Sorteio modo chat: qualquer mensagem no período conta como entrada
-      if (msg.sender.slug.toLowerCase() !== botSlug.toLowerCase()) {
+      if (
+        isModuleEnabled(channelSlug, "giveaways") &&
+        msg.sender.slug.toLowerCase() !== botSlug.toLowerCase()
+      ) {
         await giveawayService.tryEnterFromChat(channelSlug, {
           kickUserId: msg.sender.id,
           username: msg.sender.username,
@@ -66,19 +83,25 @@ async function main(): Promise<void> {
         });
       }
 
-      await router.dispatch(msg, {
-        message: msg,
-        broadcasterId,
-        botSlug,
-        channelSlug,
-        chatroomId,
-      });
+      if (isModuleEnabled(channelSlug, "commands")) {
+        metrics.recordCommand();
+        await router.dispatch(msg, {
+          message: msg,
+          broadcasterId,
+          botSlug,
+          channelSlug,
+          chatroomId,
+        });
+      }
     })();
   });
 
   listener.on("connected", () => {
     const commands = router.getRegisteredCommands().map((c) => `!${c}`).join(" | ");
     logger.info("Bot online — aguardando mensagens no chat...");
+    logger.info(`Fila de eventos pronta depth=${eventQueue.size()}`, {
+      module: "queue",
+    });
     logger.info(`Comandos built-in: ${commands}`);
     logger.info("Comandos customizáveis disponíveis via dashboard → /api/commands");
     logger.info("Loyalty: !pontos | !top | !dar @usuario quantidade");

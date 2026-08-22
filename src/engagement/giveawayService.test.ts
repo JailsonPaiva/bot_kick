@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   clampEntryDurationSeconds,
+  canEnter,
   describeEntryInstructions,
   isEntryWindowOpen,
   normalizeEntryCommand,
@@ -117,5 +118,23 @@ describe("giveawayService entry mode", () => {
     assert.match(chat, /Digite qualquer mensagem/i);
     assert.match(chat, /5 ponto/);
     assert.match(chat, /2x/);
+  });
+});
+
+describe("giveawayService canEnter", () => {
+  it("followers exige badge ou follower conhecido", () => {
+    assert.equal(canEnter("followers", []), false);
+    assert.equal(canEnter("followers", [{ type: "follower", text: "F" }]), true);
+    assert.equal(canEnter("followers", [], true), true);
+  });
+
+  it("both aceita sub ou follower", () => {
+    assert.equal(canEnter("both", []), false);
+    assert.equal(canEnter("both", [{ type: "subscriber", text: "S" }]), true);
+    assert.equal(canEnter("both", [{ type: "follower", text: "F" }]), true);
+  });
+
+  it("everyone sempre entra", () => {
+    assert.equal(canEnter("everyone", []), true);
   });
 });

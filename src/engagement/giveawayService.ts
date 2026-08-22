@@ -63,10 +63,24 @@ export function hasSubscriberBadge(badges: GiveawayUser["badges"]): boolean {
   });
 }
 
-function canEnter(filterType: string, badges: GiveawayUser["badges"]): boolean {
-  if (filterType === "everyone" || filterType === "followers") return true;
+export function hasFollowerBadge(badges: GiveawayUser["badges"]): boolean {
+  return badges.some((b) => {
+    const t = b.type.toLowerCase();
+    return t === "follower" || t === "following" || t === "og";
+  });
+}
+
+export function canEnter(
+  filterType: string,
+  badges: GiveawayUser["badges"],
+  knownFollower = false
+): boolean {
   const isSub = hasSubscriberBadge(badges);
-  if (filterType === "subscribers" || filterType === "both") return isSub;
+  const isFollower = knownFollower || hasFollowerBadge(badges);
+  if (filterType === "everyone") return true;
+  if (filterType === "subscribers") return isSub;
+  if (filterType === "followers") return isFollower;
+  if (filterType === "both") return isSub || isFollower;
   return true;
 }
 
@@ -105,6 +119,21 @@ export function totalEntryTickets(
   entries: ReadonlyArray<{ weight: number }>
 ): number {
   return entries.reduce((sum, e) => sum + Math.max(1, e.weight), 0);
+}
+
+export async function isKnownFollower(
+  channelSlug: string,
+  kickUserId: number
+): Promise<boolean> {
+  const row = await prisma.pointTransaction.findFirst({
+    where: {
+      channelSlug,
+      kickUserId: BigInt(kickUserId),
+      type: "follow",
+    },
+    select: { id: true },
+  });
+  return Boolean(row);
 }
 
 export function describeEntryInstructions(giveaway: {
@@ -219,7 +248,8 @@ export class GiveawayService {
       };
     }
 
-    if (!canEnter(giveaway.filterType, user.badges)) {
+    const knownFollower = await isKnownFollower(channelSlug, user.kickUserId);
+    if (!canEnter(giveaway.filterType, user.badges, knownFollower)) {
       return {
         ok: false,
         error: "Você não atende aos requisitos deste sorteio.",

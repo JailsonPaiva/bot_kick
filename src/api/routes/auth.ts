@@ -3,7 +3,7 @@
  */
 
 import { Router } from "express";
-import { verifyPassword, generateToken } from "../auth.js";
+import { verifyPassword, generateToken, isLoginRateLimited } from "../auth.js";
 import type { ApiResponse } from "../types.js";
 import { logger } from "../../utils/logger.js";
 
@@ -12,6 +12,12 @@ export function createAuthRouter(): Router {
 
   router.post("/login", async (req, res) => {
     const { password } = req.body;
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+
+    if (isLoginRateLimited(ip)) {
+      res.status(429).json({ success: false, error: "Muitas tentativas de login" });
+      return;
+    }
 
     if (!password) {
       res.status(400).json({ success: false, error: "Senha não fornecida" });

@@ -8,6 +8,8 @@ import WebSocket from "ws";
 import axios from "axios";
 import type { ChatMessage, ChannelResponse, KickEvent } from "./types.js";
 import { logger } from "../utils/logger.js";
+import { runtimeHealth } from "../ops/runtimeHealth.js";
+import { metrics } from "../ops/metrics.js";
 
 const PUSHER_APP_KEY = "32cbd69e4b950bf97679";
 const PUSHER_WS_URL = `wss://ws-us2.pusher.com/app/${PUSHER_APP_KEY}?protocol=7&client=js&version=7.6.0&flash=false`;
@@ -38,6 +40,7 @@ export class WsListener extends EventEmitter {
 
   connect(): void {
     this.intentionalClose = false;
+    runtimeHealth.setWs("connecting");
     this.openConnection();
   }
 
@@ -52,6 +55,8 @@ export class WsListener extends EventEmitter {
     }
 
     logger.info("WebSocket desconectado (intencional)");
+    runtimeHealth.setWs("disconnected");
+    metrics.setWsConnected(false);
   }
 
   private openConnection(): void {
@@ -72,6 +77,8 @@ export class WsListener extends EventEmitter {
       this.clearPingTimer();
       logger.warn(`WebSocket fechado (code=${code}, reason=${reason.toString()})`);
       this.emit("disconnected");
+      runtimeHealth.setWs("disconnected");
+      metrics.setWsConnected(false);
 
       if (!this.intentionalClose) {
         this.scheduleReconnect();
@@ -126,6 +133,8 @@ export class WsListener extends EventEmitter {
     });
 
     this.startPingTimer();
+    runtimeHealth.setWs("connected");
+    metrics.setWsConnected(true);
     this.emit("connected");
   }
 
@@ -176,6 +185,8 @@ export class WsListener extends EventEmitter {
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
 
+    metrics.recordWsReconnect();
+    runtimeHealth.setWs("connecting");
     logger.info(`Reconectando em ${this.backoffMs}ms...`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;

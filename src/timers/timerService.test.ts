@@ -1,3 +1,4 @@
+import "dotenv/config";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { TimerService } from "./timerService.js";
@@ -60,6 +61,32 @@ describe("TimerService", () => {
     assert.equal(cleared.length, 1);
     assert.equal(callbacks.length, 2);
 
+    service.stop();
+  });
+
+  it("não dispara quando viewers < minViewers", async () => {
+    const callbacks: Array<() => void> = [];
+    const sent: string[] = [];
+
+    const service = new TimerService({
+      listActiveTimers: async () => [
+        { id: "t-min", intervalMinutes: 1, messages: ["X"], minViewers: 10 },
+      ],
+      send: async (_id, content) => {
+        sent.push(content);
+      },
+      getViewerCount: () => 2,
+      setIntervalFn: ((cb: () => void) => {
+        callbacks.push(cb);
+        return { id: 1 } as unknown as ReturnType<typeof setInterval>;
+      }) as typeof setInterval,
+      clearIntervalFn: (() => {}) as typeof clearInterval,
+    });
+
+    await service.start(1, "canal");
+    callbacks[0]?.();
+    await Promise.resolve();
+    assert.deepEqual(sent, []);
     service.stop();
   });
 });
