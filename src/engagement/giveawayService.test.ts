@@ -6,6 +6,7 @@ import {
   canEnter,
   describeEntryInstructions,
   isEntryWindowOpen,
+  normalizeGiveawayDrawWidgetOptions,
   normalizeEntryCommand,
   normalizeEntryMode,
   pickWeightedEntry,
@@ -118,6 +119,28 @@ describe("giveawayService entry mode", () => {
     assert.match(chat, /Digite qualquer mensagem/i);
     assert.match(chat, /5 ponto/);
     assert.match(chat, /2x/);
+  });
+
+  it("normalizeGiveawayDrawWidgetOptions aplica defaults e limites", () => {
+    const defaults = normalizeGiveawayDrawWidgetOptions(undefined);
+    assert.equal(defaults.animationDurationMs, 3600);
+    assert.equal(defaults.confettiEnabled, true);
+    assert.equal(defaults.soundEnabled, false);
+    assert.equal(defaults.showTopParticipants, true);
+    assert.equal(defaults.topParticipantsLimit, 5);
+
+    const custom = normalizeGiveawayDrawWidgetOptions({
+      animationDurationMs: 15_000,
+      confettiEnabled: false,
+      soundEnabled: true,
+      showTopParticipants: false,
+      topParticipantsLimit: 1,
+    });
+    assert.equal(custom.animationDurationMs, 12_000);
+    assert.equal(custom.confettiEnabled, false);
+    assert.equal(custom.soundEnabled, true);
+    assert.equal(custom.showTopParticipants, false);
+    assert.equal(custom.topParticipantsLimit, 3);
   });
 });
 

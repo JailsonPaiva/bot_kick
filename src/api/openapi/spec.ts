@@ -217,11 +217,39 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
           channelSlug: { type: "string" },
           linksEnabled: { type: "boolean" },
           linksWhitelist: { type: "array", items: { type: "string" } },
+          linksActionType: { type: "string", example: "warn" },
+          linksTimeoutDurationMinutes: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10080,
+            default: 1,
+          },
           capsEnabled: { type: "boolean" },
           capsPercent: { type: "integer" },
+          capsActionType: { type: "string", example: "delete" },
+          capsTimeoutDurationMinutes: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10080,
+            default: 1,
+          },
           spamEnabled: { type: "boolean" },
           spamWindow: { type: "integer" },
+          spamActionType: { type: "string", example: "warn" },
+          spamTimeoutDurationMinutes: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10080,
+            default: 1,
+          },
           bannedWords: { type: "array", items: { type: "string" } },
+          bannedActionType: { type: "string", example: "timeout" },
+          bannedTimeoutDurationMinutes: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10080,
+            default: 1,
+          },
           actionType: { type: "string", example: "warn" },
           timeoutDurationMinutes: {
             type: "integer",
@@ -1232,7 +1260,29 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
             "application/json": {
               schema: {
                 type: "object",
-                properties: { channelSlug: { type: "string" } },
+                properties: {
+                  channelSlug: { type: "string" },
+                  widgetOptions: {
+                    type: "object",
+                    properties: {
+                      animationDurationMs: {
+                        type: "integer",
+                        minimum: 1200,
+                        maximum: 12000,
+                        default: 3600,
+                      },
+                      confettiEnabled: { type: "boolean", default: true },
+                      soundEnabled: { type: "boolean", default: false },
+                      showTopParticipants: { type: "boolean", default: true },
+                      topParticipantsLimit: {
+                        type: "integer",
+                        minimum: 3,
+                        maximum: 10,
+                        default: 5,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1254,7 +1304,29 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
             "application/json": {
               schema: {
                 type: "object",
-                properties: { channelSlug: { type: "string" } },
+                properties: {
+                  channelSlug: { type: "string" },
+                  widgetOptions: {
+                    type: "object",
+                    properties: {
+                      animationDurationMs: {
+                        type: "integer",
+                        minimum: 1200,
+                        maximum: 12000,
+                        default: 3600,
+                      },
+                      confettiEnabled: { type: "boolean", default: true },
+                      soundEnabled: { type: "boolean", default: false },
+                      showTopParticipants: { type: "boolean", default: true },
+                      topParticipantsLimit: {
+                        type: "integer",
+                        minimum: 3,
+                        maximum: 10,
+                        default: 5,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1262,6 +1334,54 @@ Mesma porta da API (\`API_PORT\`, padrão 3001):
         responses: {
           "200": { description: "Novo vencedor" },
           "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/giveaways/widget-config": {
+      get: {
+        tags: ["Giveaways"],
+        summary: "Obter configuração persistida do widget de sorteio",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "channel", in: "query", schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Configuração atual do widget" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      put: {
+        tags: ["Giveaways"],
+        summary: "Salvar configuração do widget de sorteio por canal",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  channelSlug: { type: "string" },
+                  animationDurationMs: {
+                    type: "integer",
+                    minimum: 1200,
+                    maximum: 12000,
+                    default: 3600,
+                  },
+                  confettiEnabled: { type: "boolean", default: true },
+                  soundEnabled: { type: "boolean", default: false },
+                  showTopParticipants: { type: "boolean", default: true },
+                  topParticipantsLimit: {
+                    type: "integer",
+                    minimum: 3,
+                    maximum: 10,
+                    default: 5,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Configuração salva" },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },

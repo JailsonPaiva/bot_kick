@@ -24,9 +24,23 @@ export interface CreateGiveawayOptions {
   entryDurationSeconds?: number;
 }
 
+export interface GiveawayDrawWidgetOptions {
+  animationDurationMs: number;
+  confettiEnabled: boolean;
+  soundEnabled: boolean;
+  showTopParticipants: boolean;
+  topParticipantsLimit: number;
+}
+
 const MIN_CHAT_ENTRY_SECONDS = 15;
 const MAX_CHAT_ENTRY_SECONDS = 3600;
 const DEFAULT_CHAT_ENTRY_SECONDS = 60;
+const DEFAULT_WIDGET_ANIMATION_MS = 3600;
+const MIN_WIDGET_ANIMATION_MS = 1200;
+const MAX_WIDGET_ANIMATION_MS = 12000;
+const DEFAULT_TOP_PARTICIPANTS_LIMIT = 5;
+const MIN_TOP_PARTICIPANTS_LIMIT = 3;
+const MAX_TOP_PARTICIPANTS_LIMIT = 10;
 
 function normalizeFilter(filterType: string): string {
   const value = filterType.toLowerCase();
@@ -55,6 +69,50 @@ export function clampEntryDurationSeconds(value: unknown): number {
   }
   return Math.min(MAX_CHAT_ENTRY_SECONDS, Math.max(MIN_CHAT_ENTRY_SECONDS, n));
 }
+
+function parseBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n =
+    typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+export function normalizeGiveawayDrawWidgetOptions(
+  value: unknown
+): GiveawayDrawWidgetOptions {
+  const source =
+    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    animationDurationMs: clampInt(
+      source.animationDurationMs,
+      MIN_WIDGET_ANIMATION_MS,
+      MAX_WIDGET_ANIMATION_MS,
+      DEFAULT_WIDGET_ANIMATION_MS
+    ),
+    confettiEnabled: parseBoolean(source.confettiEnabled, true),
+    soundEnabled: parseBoolean(source.soundEnabled, false),
+    showTopParticipants: parseBoolean(source.showTopParticipants, true),
+    topParticipantsLimit: clampInt(
+      source.topParticipantsLimit,
+      MIN_TOP_PARTICIPANTS_LIMIT,
+      MAX_TOP_PARTICIPANTS_LIMIT,
+      DEFAULT_TOP_PARTICIPANTS_LIMIT
+    ),
+  };
+}
+
+export const defaultGiveawayDrawWidgetOptions: GiveawayDrawWidgetOptions =
+  normalizeGiveawayDrawWidgetOptions(undefined);
 
 export function hasSubscriberBadge(badges: GiveawayUser["badges"]): boolean {
   return badges.some((b) => {
@@ -344,6 +402,7 @@ export class GiveawayService {
         giveawayId: string;
         entries: number;
         tickets: number;
+        participants: Array<{ username: string; weight: number }>;
         prize: string;
       }
   > {
@@ -366,6 +425,7 @@ export class GiveawayService {
         giveawayId: giveaway.id,
         entries: 0,
         tickets: 0,
+        participants: [],
         prize: giveaway.prize,
       };
     }
@@ -391,6 +451,10 @@ export class GiveawayService {
       giveawayId: giveaway.id,
       entries: entries.length,
       tickets,
+      participants: entries.map((entry) => ({
+        username: entry.username,
+        weight: Math.max(1, entry.weight),
+      })),
       prize: giveaway.prize,
     };
   }
@@ -401,6 +465,9 @@ export class GiveawayService {
         ok: true;
         winner: { kickUserId: number; username: string };
         giveawayId: string;
+        entries: number;
+        tickets: number;
+        participants: Array<{ username: string; weight: number }>;
         prize: string;
       }
   > {
@@ -437,6 +504,12 @@ export class GiveawayService {
         username: winner.username,
       },
       giveawayId: giveaway.id,
+      entries: entries.length,
+      tickets: totalEntryTickets(entries),
+      participants: entries.map((entry) => ({
+        username: entry.username,
+        weight: Math.max(1, entry.weight),
+      })),
       prize: giveaway.prize,
     };
   }

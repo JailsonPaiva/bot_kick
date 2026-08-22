@@ -11,6 +11,7 @@ import {
   loyaltyService,
   type LoyaltyConfigUpdate,
 } from "../../loyalty/loyaltyService.js";
+import { storeService } from "../../loyalty/storeService.js";
 import {
   isLoyaltyEventType,
   type LoyaltyEventType,
@@ -161,6 +162,67 @@ export function createLoyaltyRouter(): Router {
           },
         }) satisfies ApiResponse
       );
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.get("/loyalty/store/items", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    const includeInactive = String(req.query.includeInactive ?? "false") === "true";
+    try {
+      const items = await storeService.listItems(channelSlug, includeInactive);
+      res.json({ success: true, data: items } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.post("/loyalty/store/items", authMiddleware, async (req, res) => {
+    const channelSlug =
+      (req.body.channelSlug as string) ||
+      (req.query.channel as string) ||
+      DEFAULT_CHANNEL;
+    try {
+      const item = await storeService.createItem(channelSlug, req.body);
+      res.status(201).json({ success: true, data: item } satisfies ApiResponse);
+    } catch (err) {
+      res.status(400).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.put("/loyalty/store/items/:id", authMiddleware, async (req, res) => {
+    const channelSlug =
+      (req.body.channelSlug as string) ||
+      (req.query.channel as string) ||
+      DEFAULT_CHANNEL;
+    const itemId = String(req.params.id);
+    try {
+      const item = await storeService.updateItem(channelSlug, itemId, req.body);
+      res.json({ success: true, data: item } satisfies ApiResponse);
+    } catch (err) {
+      res.status(400).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.delete("/loyalty/store/items/:id", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    const itemId = String(req.params.id);
+    try {
+      const item = await storeService.deactivateItem(channelSlug, itemId);
+      res.json({ success: true, data: item } satisfies ApiResponse);
+    } catch (err) {
+      res.status(400).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.get("/loyalty/store/redemptions", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    const page = Number.parseInt(req.query.page as string, 10) || 1;
+    const limit = Number.parseInt(req.query.limit as string, 10) || 20;
+    try {
+      const data = await storeService.listRedemptions(channelSlug, page, limit);
+      res.json(serializeBigInts({ success: true, data } satisfies ApiResponse));
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

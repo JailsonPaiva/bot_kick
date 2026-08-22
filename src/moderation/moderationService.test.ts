@@ -30,11 +30,19 @@ function makeMessage(
 const baseConfig = {
   linksEnabled: false,
   linksWhitelist: [] as string[],
+  linksActionType: "warn",
+  linksTimeoutDurationMinutes: 1,
   capsEnabled: false,
   capsPercent: 70,
+  capsActionType: "warn",
+  capsTimeoutDurationMinutes: 1,
   spamEnabled: false,
   spamWindow: 3,
+  spamActionType: "warn",
+  spamTimeoutDurationMinutes: 1,
   bannedWords: [] as string[],
+  bannedActionType: "warn",
+  bannedTimeoutDurationMinutes: 1,
   actionType: "warn",
   timeoutDurationMinutes: 1,
 };
@@ -151,6 +159,8 @@ describe("moderationService", () => {
           bannedWords: ["palavra-ruim"],
           actionType: "timeout",
           timeoutDurationMinutes: 10,
+          bannedActionType: "timeout",
+          bannedTimeoutDurationMinutes: 10,
         }),
         logViolation: async () => {},
         send: async () => {},
@@ -162,5 +172,43 @@ describe("moderationService", () => {
 
     assert.equal(result.blocked, true);
     assert.deepEqual(timeouts, [{ userId: 99, minutes: 10 }]);
+  });
+
+  it("permite penalidade diferente por filtro", async () => {
+    const deletedMessages: string[] = [];
+    const warnedMessages: string[] = [];
+    const timeouts: Array<{ userId: number; minutes: number }> = [];
+
+    const result = await checkModeration(
+      makeMessage("visite http://fora-da-lista.com"),
+      "canal",
+      10,
+      {
+        getConfig: async () => ({
+          ...baseConfig,
+          linksEnabled: true,
+          linksWhitelist: ["kick.com"],
+          linksActionType: "delete",
+          linksTimeoutDurationMinutes: 25,
+          actionType: "warn",
+          timeoutDurationMinutes: 3,
+        }),
+        logViolation: async () => {},
+        send: async (_id, content) => {
+          warnedMessages.push(content);
+        },
+        deleteMessage: async (messageId) => {
+          deletedMessages.push(messageId);
+        },
+        applyTimeout: async (_bc, userId, minutes) => {
+          timeouts.push({ userId, minutes });
+        },
+      }
+    );
+
+    assert.equal(result.blocked, true);
+    assert.equal(deletedMessages.length, 1);
+    assert.equal(warnedMessages.length, 0);
+    assert.equal(timeouts.length, 0);
   });
 });

@@ -22,11 +22,19 @@ export interface ModerationResult {
 export interface ModerationConfigEntity {
   linksEnabled: boolean;
   linksWhitelist: string[];
+  linksActionType?: string;
+  linksTimeoutDurationMinutes?: number;
   capsEnabled: boolean;
   capsPercent: number;
+  capsActionType?: string;
+  capsTimeoutDurationMinutes?: number;
   spamEnabled: boolean;
   spamWindow: number;
+  spamActionType?: string;
+  spamTimeoutDurationMinutes?: number;
   bannedWords: string[];
+  bannedActionType?: string;
+  bannedTimeoutDurationMinutes?: number;
   actionType: string;
   timeoutDurationMinutes: number;
 }
@@ -69,6 +77,9 @@ const URL_REGEX = /https?:\/\/[^\s]+|www\.[^\s]+|\b\w+\.\w{2,}\/\S*/gi;
 const DEFAULT_TIMEOUT_MINUTES = 1;
 const MIN_TIMEOUT_MINUTES = 1;
 const MAX_TIMEOUT_MINUTES = 10_080; // 7 dias
+const DEFAULT_ACTION_TYPE = "warn";
+const VALID_ACTIONS = new Set(["warn", "delete", "timeout"]);
+type ModerationFilter = "links" | "caps" | "spam" | "banned";
 
 export function clampTimeoutDurationMinutes(value: unknown): number {
   const n =
@@ -77,6 +88,59 @@ export function clampTimeoutDurationMinutes(value: unknown): number {
     return DEFAULT_TIMEOUT_MINUTES;
   }
   return Math.min(MAX_TIMEOUT_MINUTES, Math.max(MIN_TIMEOUT_MINUTES, n));
+}
+
+function normalizeActionType(actionType: unknown): "warn" | "delete" | "timeout" {
+  const action =
+    typeof actionType === "string" ? actionType.trim().toLowerCase() : "";
+  if (VALID_ACTIONS.has(action)) {
+    return action as "warn" | "delete" | "timeout";
+  }
+  return DEFAULT_ACTION_TYPE;
+}
+
+function getFilterPenalty(
+  config: ModerationConfigEntity,
+  filter: ModerationFilter
+): { action: "warn" | "delete" | "timeout"; timeoutMinutes: number } {
+  const fallbackAction = normalizeActionType(config.actionType);
+  const fallbackTimeout = clampTimeoutDurationMinutes(
+    config.timeoutDurationMinutes ?? DEFAULT_TIMEOUT_MINUTES
+  );
+
+  if (filter === "links") {
+    return {
+      action: normalizeActionType(config.linksActionType ?? fallbackAction),
+      timeoutMinutes: clampTimeoutDurationMinutes(
+        config.linksTimeoutDurationMinutes ?? fallbackTimeout
+      ),
+    };
+  }
+
+  if (filter === "caps") {
+    return {
+      action: normalizeActionType(config.capsActionType ?? fallbackAction),
+      timeoutMinutes: clampTimeoutDurationMinutes(
+        config.capsTimeoutDurationMinutes ?? fallbackTimeout
+      ),
+    };
+  }
+
+  if (filter === "spam") {
+    return {
+      action: normalizeActionType(config.spamActionType ?? fallbackAction),
+      timeoutMinutes: clampTimeoutDurationMinutes(
+        config.spamTimeoutDurationMinutes ?? fallbackTimeout
+      ),
+    };
+  }
+
+  return {
+    action: normalizeActionType(config.bannedActionType ?? fallbackAction),
+    timeoutMinutes: clampTimeoutDurationMinutes(
+      config.bannedTimeoutDurationMinutes ?? fallbackTimeout
+    ),
+  };
 }
 
 async function loadConfig(channelSlug: string) {
@@ -194,26 +258,28 @@ export async function checkModeration(
 
   const content = msg.content;
   let reason: string | null = null;
+  let triggeredFilter: ModerationFilter | null = null;
 
   if (config.linksEnabled && checkLinks(content, config.linksWhitelist)) {
     reason = "link não permitido";
+    triggeredFilter = "links";
   } else if (config.capsEnabled && checkCaps(content, config.capsPercent)) {
     reason = `excesso de maiúsculas (>${config.capsPercent}%)`;
+    triggeredFilter = "caps";
   } else if (
     config.spamEnabled &&
     checkSpam(msg.sender.id, content, config.spamWindow)
   ) {
     reason = "spam detectado";
+    triggeredFilter = "spam";
   } else if (checkBannedWords(content, config.bannedWords)) {
     reason = "palavra proibida";
+    triggeredFilter = "banned";
   }
 
-  if (!reason) return { blocked: false };
+  if (!reason || !triggeredFilter) return { blocked: false };
 
-  const action = config.actionType;
-  const timeoutMinutes = clampTimeoutDurationMinutes(
-    config.timeoutDurationMinutes ?? DEFAULT_TIMEOUT_MINUTES
-  );
+  const { action, timeoutMinutes } = getFilterPenalty(config, triggeredFilter);
 
   logger.warn(
     `[MOD] ${msg.sender.username} — ${reason} (ação: ${action}${
@@ -252,7 +318,7 @@ export async function checkModeration(
     }
   }
 
-  if (action === "warn" || action === "timeout" || action === "ban") {
+  if (action === "warn" || action === "timeout") {
     const timeoutHint =
       action === "timeout" ? ` Timeout: ${timeoutMinutes} min.` : "";
     await deps.send(

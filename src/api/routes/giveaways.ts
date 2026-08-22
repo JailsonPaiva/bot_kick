@@ -4,17 +4,38 @@
 
 import { Router } from "express";
 import { authMiddleware } from "../auth.js";
+import { prisma } from "../../infra/prisma/client.js";
 import {
+  defaultGiveawayDrawWidgetOptions,
   giveawayService,
+  normalizeGiveawayDrawWidgetOptions,
   normalizeEntryMode,
 } from "../../engagement/giveawayService.js";
 import type { ApiResponse } from "../types.js";
 import { serializeBigInts } from "../../utils/serializeBigInt.js";
+import { broadcastGiveawayDraw } from "../alertEvents.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
 
 export function createGiveawaysRouter(): Router {
   const router = Router();
+
+  async function resolveWidgetOptions(
+    channelSlug: string,
+    override?: unknown
+  ) {
+    const saved = await prisma.giveawayWidgetConfig.findUnique({
+      where: { channelSlug },
+    });
+    const base = saved
+      ? normalizeGiveawayDrawWidgetOptions(saved)
+      : defaultGiveawayDrawWidgetOptions;
+    const overrideSource =
+      override && typeof override === "object"
+        ? (override as Record<string, unknown>)
+        : {};
+    return normalizeGiveawayDrawWidgetOptions({ ...base, ...overrideSource });
+  }
 
   router.get("/giveaways", authMiddleware, async (req, res) => {
     const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
@@ -80,12 +101,30 @@ export function createGiveawaysRouter(): Router {
   router.post("/giveaways/draw", authMiddleware, async (req, res) => {
     const channelSlug = (req.body.channelSlug as string) || DEFAULT_CHANNEL;
     try {
+      const widgetOptions = await resolveWidgetOptions(
+        channelSlug,
+        req.body.widgetOptions
+      );
       const result = await giveawayService.draw(channelSlug);
       if (!result.ok) {
         res.status(400).json({ success: false, error: result.error });
         return;
       }
-      res.json({ success: true, data: serializeBigInts(result) } satisfies ApiResponse);
+      broadcastGiveawayDraw({
+        channelSlug,
+        giveawayId: result.giveawayId,
+        prize: result.prize,
+        winner: result.winner,
+        participants: result.participants,
+        entries: result.entries,
+        tickets: result.tickets,
+        widgetOptions,
+        source: "draw",
+      });
+      res.json({
+        success: true,
+        data: serializeBigInts({ ...result, widgetOptions }),
+      } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }
@@ -94,12 +133,66 @@ export function createGiveawaysRouter(): Router {
   router.post("/giveaways/reroll", authMiddleware, async (req, res) => {
     const channelSlug = (req.body.channelSlug as string) || DEFAULT_CHANNEL;
     try {
+      const widgetOptions = await resolveWidgetOptions(
+        channelSlug,
+        req.body.widgetOptions
+      );
       const result = await giveawayService.reroll(channelSlug);
       if (!result.ok) {
         res.status(400).json({ success: false, error: result.error });
         return;
       }
-      res.json({ success: true, data: serializeBigInts(result) } satisfies ApiResponse);
+      broadcastGiveawayDraw({
+        channelSlug,
+        giveawayId: result.giveawayId,
+        prize: result.prize,
+        winner: result.winner,
+        participants: result.participants,
+        entries: result.entries,
+        tickets: result.tickets,
+        widgetOptions,
+        source: "reroll",
+      });
+      res.json({
+        success: true,
+        data: serializeBigInts({ ...result, widgetOptions }),
+      } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.get("/giveaways/widget-config", authMiddleware, async (req, res) => {
+    const channelSlug = (req.query.channel as string) || DEFAULT_CHANNEL;
+    try {
+      const saved = await prisma.giveawayWidgetConfig.findUnique({
+        where: { channelSlug },
+      });
+      const config = saved
+        ? normalizeGiveawayDrawWidgetOptions(saved)
+        : defaultGiveawayDrawWidgetOptions;
+      res.json({ success: true, data: config } satisfies ApiResponse);
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  router.put("/giveaways/widget-config", authMiddleware, async (req, res) => {
+    const channelSlug = (req.body.channelSlug as string) || DEFAULT_CHANNEL;
+    try {
+      const normalized = normalizeGiveawayDrawWidgetOptions(req.body);
+      const config = await prisma.giveawayWidgetConfig.upsert({
+        where: { channelSlug },
+        create: {
+          channelSlug,
+          ...normalized,
+        },
+        update: normalized,
+      });
+      res.json({
+        success: true,
+        data: normalizeGiveawayDrawWidgetOptions(config),
+      } satisfies ApiResponse);
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

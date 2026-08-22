@@ -200,7 +200,7 @@ export const handleGiveawayReroll: CommandHandler = async (_parsed, ctx) => {
 
 export const handlePoll: CommandHandler = async (parsed, ctx) => {
   const isStaff = isBroadcasterOrMod(ctx.message.sender.identity.badges);
-  const sub = parsed.subcommand;
+  const sub = parsed.subcommand ?? "";
 
   if (sub === "status") {
     const poll = await pollService.getOpen(ctx.channelSlug);
@@ -246,10 +246,14 @@ export const handlePoll: CommandHandler = async (parsed, ctx) => {
     return;
   }
 
-  if (sub !== "start") {
+  const raw = parsed.rawArgs.trim();
+  const isInlineStart =
+    sub !== "start" && raw.includes("|") && !["status", "end"].includes(sub);
+
+  if (sub !== "start" && !isInlineStart) {
     await sendMessage(
       ctx.broadcasterId,
-      "Uso: !poll start pergunta | opcao1 | opcao2 [| opcao3...] | !poll status | !poll end"
+      "Uso: !poll pergunta | opcao1 | opcao2 [| opcao3...] | !poll status | !poll end"
     );
     return;
   }
@@ -259,7 +263,6 @@ export const handlePoll: CommandHandler = async (parsed, ctx) => {
     return;
   }
 
-  const raw = parsed.rawArgs.trim();
   const parts = raw.split("|").map((p) => p.trim()).filter(Boolean);
   if (parts.length < 3) {
     await sendMessage(

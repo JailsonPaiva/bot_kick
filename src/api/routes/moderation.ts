@@ -12,6 +12,28 @@ import {
 import type { ApiResponse } from "../types.js";
 
 const DEFAULT_CHANNEL = process.env.KICK_CHANNEL_SLUG ?? "";
+const VALID_ACTION_TYPES = new Set(["warn", "delete", "timeout"]);
+
+function parseTimeoutField(name: string, value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 10_080
+  ) {
+    throw new Error(`${name} deve ser um inteiro entre 1 e 10080`);
+  }
+  return clampTimeoutDurationMinutes(value);
+}
+
+function parseActionField(name: string, value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !VALID_ACTION_TYPES.has(value)) {
+    throw new Error(`${name} deve ser um de: warn, delete, timeout`);
+  }
+  return value;
+}
 
 export function createModerationRouter(): Router {
   const router = Router();
@@ -30,11 +52,19 @@ export function createModerationRouter(): Router {
             channelSlug,
             linksEnabled: false,
             linksWhitelist: [],
+            linksActionType: "warn",
+            linksTimeoutDurationMinutes: 1,
             capsEnabled: false,
             capsPercent: 70,
+            capsActionType: "warn",
+            capsTimeoutDurationMinutes: 1,
             spamEnabled: false,
             spamWindow: 5,
+            spamActionType: "warn",
+            spamTimeoutDurationMinutes: 1,
             bannedWords: [],
+            bannedActionType: "warn",
+            bannedTimeoutDurationMinutes: 1,
             actionType: "warn",
             timeoutDurationMinutes: 1,
           },
@@ -53,68 +83,136 @@ export function createModerationRouter(): Router {
     const {
       linksEnabled,
       linksWhitelist,
+      linksActionType,
+      linksTimeoutDurationMinutes,
       capsEnabled,
       capsPercent,
+      capsActionType,
+      capsTimeoutDurationMinutes,
       spamEnabled,
       spamWindow,
+      spamActionType,
+      spamTimeoutDurationMinutes,
       bannedWords,
+      bannedActionType,
+      bannedTimeoutDurationMinutes,
       actionType,
       timeoutDurationMinutes,
     } = req.body as {
       linksEnabled?: boolean;
       linksWhitelist?: string[];
+      linksActionType?: string;
+      linksTimeoutDurationMinutes?: number;
       capsEnabled?: boolean;
       capsPercent?: number;
+      capsActionType?: string;
+      capsTimeoutDurationMinutes?: number;
       spamEnabled?: boolean;
       spamWindow?: number;
+      spamActionType?: string;
+      spamTimeoutDurationMinutes?: number;
       bannedWords?: string[];
+      bannedActionType?: string;
+      bannedTimeoutDurationMinutes?: number;
       actionType?: string;
       timeoutDurationMinutes?: number;
     };
 
-    if (
-      timeoutDurationMinutes !== undefined &&
-      (typeof timeoutDurationMinutes !== "number" ||
-        !Number.isInteger(timeoutDurationMinutes) ||
-        timeoutDurationMinutes < 1 ||
-        timeoutDurationMinutes > 10_080)
-    ) {
+    let timeoutMinutes: number | undefined;
+    let linksTimeoutMinutes: number | undefined;
+    let capsTimeoutMinutes: number | undefined;
+    let spamTimeoutMinutes: number | undefined;
+    let bannedTimeoutMinutes: number | undefined;
+    let globalAction: string | undefined;
+    let linksAction: string | undefined;
+    let capsAction: string | undefined;
+    let spamAction: string | undefined;
+    let bannedAction: string | undefined;
+
+    try {
+      timeoutMinutes = parseTimeoutField(
+        "timeoutDurationMinutes",
+        timeoutDurationMinutes
+      );
+      linksTimeoutMinutes = parseTimeoutField(
+        "linksTimeoutDurationMinutes",
+        linksTimeoutDurationMinutes
+      );
+      capsTimeoutMinutes = parseTimeoutField(
+        "capsTimeoutDurationMinutes",
+        capsTimeoutDurationMinutes
+      );
+      spamTimeoutMinutes = parseTimeoutField(
+        "spamTimeoutDurationMinutes",
+        spamTimeoutDurationMinutes
+      );
+      bannedTimeoutMinutes = parseTimeoutField(
+        "bannedTimeoutDurationMinutes",
+        bannedTimeoutDurationMinutes
+      );
+      globalAction = parseActionField("actionType", actionType);
+      linksAction = parseActionField("linksActionType", linksActionType);
+      capsAction = parseActionField("capsActionType", capsActionType);
+      spamAction = parseActionField("spamActionType", spamActionType);
+      bannedAction = parseActionField("bannedActionType", bannedActionType);
+    } catch (error) {
       res.status(400).json({
         success: false,
-        error: "timeoutDurationMinutes deve ser um inteiro entre 1 e 10080",
+        error: error instanceof Error ? error.message : "Payload inválido",
       });
       return;
     }
 
-    const timeoutMinutes =
-      timeoutDurationMinutes !== undefined
-        ? clampTimeoutDurationMinutes(timeoutDurationMinutes)
-        : undefined;
-
     try {
+      const createAction = globalAction ?? "warn";
+      const createTimeout = timeoutMinutes ?? 1;
       const config = await prisma.moderationConfig.upsert({
         where: { channelSlug },
         create: {
           channelSlug,
           linksEnabled: linksEnabled ?? false,
           linksWhitelist: linksWhitelist ?? [],
+          linksActionType: linksAction ?? createAction,
+          linksTimeoutDurationMinutes: linksTimeoutMinutes ?? createTimeout,
           capsEnabled: capsEnabled ?? false,
           capsPercent: capsPercent ?? 70,
+          capsActionType: capsAction ?? createAction,
+          capsTimeoutDurationMinutes: capsTimeoutMinutes ?? createTimeout,
           spamEnabled: spamEnabled ?? false,
           spamWindow: spamWindow ?? 5,
+          spamActionType: spamAction ?? createAction,
+          spamTimeoutDurationMinutes: spamTimeoutMinutes ?? createTimeout,
           bannedWords: bannedWords ?? [],
-          actionType: actionType ?? "warn",
-          timeoutDurationMinutes: timeoutMinutes ?? 1,
+          bannedActionType: bannedAction ?? createAction,
+          bannedTimeoutDurationMinutes: bannedTimeoutMinutes ?? createTimeout,
+          actionType: createAction,
+          timeoutDurationMinutes: createTimeout,
         },
         update: {
           ...(linksEnabled !== undefined && { linksEnabled }),
           ...(linksWhitelist !== undefined && { linksWhitelist }),
+          ...(linksAction !== undefined && { linksActionType: linksAction }),
+          ...(linksTimeoutMinutes !== undefined && {
+            linksTimeoutDurationMinutes: linksTimeoutMinutes,
+          }),
           ...(capsEnabled !== undefined && { capsEnabled }),
           ...(capsPercent !== undefined && { capsPercent }),
+          ...(capsAction !== undefined && { capsActionType: capsAction }),
+          ...(capsTimeoutMinutes !== undefined && {
+            capsTimeoutDurationMinutes: capsTimeoutMinutes,
+          }),
           ...(spamEnabled !== undefined && { spamEnabled }),
           ...(spamWindow !== undefined && { spamWindow }),
+          ...(spamAction !== undefined && { spamActionType: spamAction }),
+          ...(spamTimeoutMinutes !== undefined && {
+            spamTimeoutDurationMinutes: spamTimeoutMinutes,
+          }),
           ...(bannedWords !== undefined && { bannedWords }),
-          ...(actionType !== undefined && { actionType }),
+          ...(bannedAction !== undefined && { bannedActionType: bannedAction }),
+          ...(bannedTimeoutMinutes !== undefined && {
+            bannedTimeoutDurationMinutes: bannedTimeoutMinutes,
+          }),
+          ...(globalAction !== undefined && { actionType: globalAction }),
           ...(timeoutMinutes !== undefined && {
             timeoutDurationMinutes: timeoutMinutes,
           }),

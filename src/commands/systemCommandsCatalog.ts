@@ -74,6 +74,12 @@ export const SYSTEM_COMMANDS_CATALOG: SystemCommandDefinition[] = [
     category: "engajamento",
   },
   {
+    trigger: "enquete",
+    description: "Alias de !poll para criar enquete com comando curto (mod)",
+    permission: "moderator",
+    category: "engajamento",
+  },
+  {
     trigger: "votar",
     description: "Registra voto na enquete ativa — !votar <número>",
     permission: "everyone",

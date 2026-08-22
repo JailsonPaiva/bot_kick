@@ -8,6 +8,11 @@ import { logger } from "../utils/logger.js";
 import type { LiveChatMessage } from "../kick/liveChatMessage.js";
 
 let io: Server | null = null;
+const CHAT_HISTORY_LIMIT = Number.parseInt(
+  process.env.CHAT_HISTORY_LIMIT ?? "200",
+  10
+);
+const chatHistory = new Map<string, ChatMessageEventPayload[]>();
 
 export interface JoinChatPayload {
   token?: string;
@@ -59,6 +64,7 @@ export function initChatEvents(server: Server): void {
       socket.join(room);
       logger.info(`[CHAT] ${socket.id} entrou em ${room}`);
       socket.emit("chat:joined", { channelSlug: result.channelSlug });
+      socket.emit("chat:history", getChatHistory(result.channelSlug));
     });
   });
 }
@@ -71,12 +77,41 @@ export function broadcastChatMessage(
   channelSlug: string,
   message: LiveChatMessage
 ): void {
-  if (!io) return;
-
   const payload: ChatMessageEventPayload = {
     ...message,
     timestamp: Date.now(),
   };
+  appendChatHistory(channelSlug, payload);
+
+  if (!io) return;
 
   io.to(chatRoom(channelSlug)).emit("chat:message", payload);
+}
+
+function appendChatHistory(
+  channelSlug: string,
+  payload: ChatMessageEventPayload
+): void {
+  const list = chatHistory.get(channelSlug) ?? [];
+  if (list.some((item) => item.id === payload.id)) return;
+  list.push(payload);
+  const trimmed =
+    list.length > CHAT_HISTORY_LIMIT
+      ? list.slice(list.length - CHAT_HISTORY_LIMIT)
+      : list;
+  chatHistory.set(channelSlug, trimmed);
+}
+
+function getChatHistory(channelSlug: string): ChatMessageEventPayload[] {
+  return [...(chatHistory.get(channelSlug) ?? [])];
+}
+
+export function __getChatHistoryForTests(
+  channelSlug: string
+): ChatMessageEventPayload[] {
+  return getChatHistory(channelSlug);
+}
+
+export function __resetChatHistoryForTests(): void {
+  chatHistory.clear();
 }

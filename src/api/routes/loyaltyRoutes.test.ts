@@ -10,6 +10,7 @@ import {
   loyaltyService,
   __resetLoyaltyStateForTests,
 } from "../../loyalty/loyaltyService.js";
+import { storeService } from "../../loyalty/storeService.js";
 
 const authHeader = {
   Authorization: `Bearer ${generateToken({ userId: "test-user", role: "admin" })}`,
@@ -41,6 +42,9 @@ describe("loyalty routes - config", () => {
     updateConfig: loyaltyService.updateConfig.bind(loyaltyService),
     awardForEvent: loyaltyService.awardForEvent.bind(loyaltyService),
     findUnique: prisma.loyaltyConfig.findUnique,
+    listStoreItems: storeService.listItems.bind(storeService),
+    createStoreItem: storeService.createItem.bind(storeService),
+    listStoreRedemptions: storeService.listRedemptions.bind(storeService),
   };
 
   afterEach(() => {
@@ -48,6 +52,9 @@ describe("loyalty routes - config", () => {
     loyaltyService.updateConfig = originals.updateConfig;
     loyaltyService.awardForEvent = originals.awardForEvent;
     prisma.loyaltyConfig.findUnique = originals.findUnique;
+    storeService.listItems = originals.listStoreItems;
+    storeService.createItem = originals.createStoreItem;
+    storeService.listRedemptions = originals.listStoreRedemptions;
     __resetLoyaltyStateForTests();
   });
 
@@ -144,6 +151,67 @@ describe("loyalty routes - config", () => {
       };
       assert.equal(body.success, true);
       assert.equal(body.data.awarded, 10);
+    });
+  });
+
+  it("GET /api/loyalty/store/items retorna itens da loja", async () => {
+    storeService.listItems = (async () => [
+      {
+        id: "i1",
+        channelSlug: "canal",
+        code: "vip",
+        title: "VIP 5 min",
+        description: null,
+        costPoints: 200,
+        stock: 5,
+        cooldownSeconds: 0,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]) as typeof storeService.listItems;
+
+    await withServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/loyalty/store/items?channel=canal`, {
+        headers: authHeader,
+      });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { success: boolean; data: Array<{ code: string }> };
+      assert.equal(body.success, true);
+      assert.equal(body.data[0]?.code, "vip");
+    });
+  });
+
+  it("POST /api/loyalty/store/items cria item", async () => {
+    storeService.createItem = (async () => ({
+      id: "i2",
+      channelSlug: "canal",
+      code: "som",
+      title: "Tocar som",
+      description: null,
+      costPoints: 150,
+      stock: null,
+      cooldownSeconds: 30,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })) as typeof storeService.createItem;
+
+    await withServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/loyalty/store/items`, {
+        method: "POST",
+        headers: { ...authHeader, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channelSlug: "canal",
+          code: "som",
+          title: "Tocar som",
+          costPoints: 150,
+        }),
+      });
+      assert.equal(res.status, 201);
+      const body = (await res.json()) as { success: boolean; data: { code: string } };
+      assert.equal(body.success, true);
+      assert.equal(body.data.code, "som");
     });
   });
 });

@@ -142,6 +142,11 @@ export function startApiServer(services: GameServices): {
           "GET /api/loyalty/config",
           "PUT /api/loyalty/config",
           "POST /api/loyalty/test-event",
+          "GET /api/loyalty/store/items",
+          "POST /api/loyalty/store/items",
+          "PUT /api/loyalty/store/items/:id",
+          "DELETE /api/loyalty/store/items/:id",
+          "GET /api/loyalty/store/redemptions",
         ],
         alerts: [
           "GET /api/alerts/overlay-token",
@@ -154,6 +159,8 @@ export function startApiServer(services: GameServices): {
           "POST /api/giveaways",
           "POST /api/giveaways/draw",
           "POST /api/giveaways/reroll",
+          "GET /api/giveaways/widget-config",
+          "PUT /api/giveaways/widget-config",
         ],
         polls: [
           "GET /api/polls",

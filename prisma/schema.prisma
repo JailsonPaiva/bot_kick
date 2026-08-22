@@ -98,11 +98,19 @@ model ModerationConfig {
   channelSlug    String   @unique
   linksEnabled   Boolean  @default(false)
   linksWhitelist String[]
+  linksActionType String  @default("warn")
+  linksTimeoutDurationMinutes Int @default(1)
   capsEnabled    Boolean  @default(false)
   capsPercent    Int      @default(70)
+  capsActionType String   @default("warn")
+  capsTimeoutDurationMinutes Int @default(1)
   spamEnabled    Boolean  @default(false)
   spamWindow     Int      @default(5)
+  spamActionType String   @default("warn")
+  spamTimeoutDurationMinutes Int @default(1)
   bannedWords    String[]
+  bannedActionType String @default("warn")
+  bannedTimeoutDurationMinutes Int @default(1)
   actionType     String   @default("warn")
   timeoutDurationMinutes Int @default(1)
   createdAt      DateTime @default(now())
@@ -171,6 +179,41 @@ model PointTransaction {
   @@index([channelSlug, kickUserId, createdAt])
 }
 
+model StoreItem {
+  id              String   @id @default(uuid())
+  channelSlug     String
+  code            String
+  title           String
+  description     String?
+  costPoints      Int
+  stock           Int?
+  cooldownSeconds Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([channelSlug, code])
+  @@index([channelSlug, isActive, createdAt])
+}
+
+model StoreRedemption {
+  id          String   @id @default(uuid())
+  channelSlug String
+  itemId      String
+  itemCode    String
+  itemTitle   String
+  kickUserId  BigInt
+  username    String
+  slug        String
+  quantity    Int      @default(1)
+  totalCost   Int
+  createdAt   DateTime @default(now())
+
+  @@index([channelSlug, createdAt])
+  @@index([channelSlug, kickUserId, createdAt])
+  @@index([itemId, createdAt])
+}
+
 model AlertConfig {
   id          String   @id @default(uuid())
   channelSlug String
@@ -232,6 +275,18 @@ model GiveawayEntry {
 
   @@unique([giveawayId, kickUserId])
   @@index([giveawayId, createdAt])
+}
+
+model GiveawayWidgetConfig {
+  id                    String   @id @default(uuid())
+  channelSlug           String   @unique
+  animationDurationMs   Int      @default(3600)
+  confettiEnabled       Boolean  @default(true)
+  soundEnabled          Boolean  @default(false)
+  showTopParticipants   Boolean  @default(true)
+  topParticipantsLimit  Int      @default(5)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Poll {

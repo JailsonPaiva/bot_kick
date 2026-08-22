@@ -35,6 +35,7 @@ export function createCommandRouter(
   router.register("entrar", handleGiveawayEntry);
   router.register("reroll", handleGiveawayReroll);
   router.register("poll", handlePoll);
+  router.register("enquete", handlePoll);
   router.register("votar", handlePollVote);
 
   if (playerRepository) {

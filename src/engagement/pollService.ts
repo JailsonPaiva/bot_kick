@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../infra/prisma/client.js";
+import { broadcastPollUpdate } from "../api/alertEvents.js";
 
 export interface PollUser {
   kickUserId: number;
@@ -21,6 +22,32 @@ function hasSubBadge(badges: PollUser["badges"]): boolean {
     const t = b.type.toLowerCase();
     return t === "subscriber" || t === "broadcaster";
   });
+}
+
+function buildPollResults(
+  options: string[],
+  votes: Array<{ option: number; weight: number }>
+) {
+  const tally = new Map<number, number>();
+  for (const vote of votes) {
+    tally.set(vote.option, (tally.get(vote.option) ?? 0) + vote.weight);
+  }
+  const totalVotes = [...tally.values()].reduce((sum, score) => sum + score, 0);
+  const results = options.map((text, index) => {
+    const option = index + 1;
+    const score = tally.get(option) ?? 0;
+    return {
+      option,
+      text,
+      score,
+      percentage: totalVotes > 0 ? Math.round((score / totalVotes) * 100) : 0,
+    };
+  });
+  const sorted = [...results].sort((a, b) => b.score - a.score);
+  const winner = sorted[0];
+  const winnerOption = winner && winner.score > 0 ? winner.option : null;
+  const winnerText = winnerOption ? options[winnerOption - 1] ?? null : null;
+  return { results, totalVotes, winnerOption, winnerText };
 }
 
 export class PollService {
@@ -54,6 +81,27 @@ export class PollService {
     pollTimers[poll.id] = setTimeout(() => {
       void this.closeById(poll.id);
     }, poll.durationS * 1000);
+
+    broadcastPollUpdate({
+      channelSlug: poll.channelSlug,
+      pollId: poll.id,
+      question: poll.question,
+      options: poll.options,
+      status: "open",
+      totalVotes: 0,
+      weightedSubs: poll.weightedSubs,
+      results: poll.options.map((text, index) => ({
+        option: index + 1,
+        text,
+        score: 0,
+        percentage: 0,
+      })),
+      winnerOption: null,
+      winnerText: null,
+      closesAt: poll.closesAt?.toISOString() ?? null,
+      closedAt: null,
+      source: "created",
+    });
 
     return poll;
   }
@@ -99,6 +147,28 @@ export class PollService {
           weight,
         },
       });
+      const refreshed = await prisma.poll.findUnique({
+        where: { id: poll.id },
+        include: { votes: true },
+      });
+      if (refreshed) {
+        const live = buildPollResults(refreshed.options, refreshed.votes);
+        broadcastPollUpdate({
+          channelSlug: refreshed.channelSlug,
+          pollId: refreshed.id,
+          question: refreshed.question,
+          options: refreshed.options,
+          status: "open",
+          totalVotes: live.totalVotes,
+          weightedSubs: refreshed.weightedSubs,
+          results: live.results,
+          winnerOption: null,
+          winnerText: null,
+          closesAt: refreshed.closesAt?.toISOString() ?? null,
+          closedAt: refreshed.closedAt?.toISOString() ?? null,
+          source: "vote",
+        });
+      }
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -149,21 +219,10 @@ export class PollService {
       return { ok: false, error: "Enquete já encerrada." };
     }
 
-    const tally = new Map<number, number>();
-    for (const vote of poll.votes) {
-      tally.set(vote.option, (tally.get(vote.option) ?? 0) + vote.weight);
-    }
-
-    const results = poll.options.map((text: string, i: number) => ({
-      option: i + 1,
-      text,
-      score: tally.get(i + 1) ?? 0,
-    }));
-
-    const sorted = [...results].sort((a, b) => b.score - a.score);
-    const winner = sorted[0];
-    const winnerOption = winner && winner.score > 0 ? winner.option : null;
-    const winnerText = winnerOption ? poll.options[winnerOption - 1] ?? null : null;
+    const { results, totalVotes, winnerOption, winnerText } = buildPollResults(
+      poll.options,
+      poll.votes
+    );
 
     if (pollTimers[poll.id]) {
       clearTimeout(pollTimers[poll.id]);
@@ -179,13 +238,29 @@ export class PollService {
       },
     });
 
+    broadcastPollUpdate({
+      channelSlug: poll.channelSlug,
+      pollId: poll.id,
+      question: poll.question,
+      options: poll.options,
+      status: "closed",
+      totalVotes,
+      weightedSubs: poll.weightedSubs,
+      results,
+      winnerOption,
+      winnerText,
+      closesAt: poll.closesAt?.toISOString() ?? null,
+      closedAt: new Date().toISOString(),
+      source: "closed",
+    });
+
     return {
       ok: true,
       pollId: poll.id,
       question: poll.question,
       winnerOption,
       winnerText,
-      totalVotes: poll.votes.length,
+      totalVotes,
       results,
     };
   }

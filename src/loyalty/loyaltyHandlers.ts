@@ -9,6 +9,7 @@ import { sendMessage } from "../chat/chatSender.js";
 import { logger } from "../utils/logger.js";
 import type { CommandHandler } from "../commands/types.js";
 import type { LoyaltyService } from "./loyaltyService.js";
+import type { StoreService } from "./storeService.js";
 
 export function createPointsHandler(service: LoyaltyService): CommandHandler {
   return async (_parsed, ctx) => {
@@ -80,6 +81,65 @@ export function createTransferHandler(service: LoyaltyService): CommandHandler {
     );
     logger.info(
       `[LOYALTY] Transferência: ${ctx.message.sender.username} -> ${result.toUsername} (${amount})`
+    );
+  };
+}
+
+export function createStoreListHandler(store: StoreService): CommandHandler {
+  return async (_parsed, ctx) => {
+    const items = await store.listItems(ctx.channelSlug, false);
+    if (items.length === 0) {
+      await sendMessage(
+        ctx.broadcasterId,
+        "🛒 Loja vazia no momento. O streamer ainda não cadastrou itens."
+      );
+      return;
+    }
+
+    const line = items
+      .slice(0, 8)
+      .map((item) => {
+        const stock =
+          item.stock === null ? "∞" : item.stock > 0 ? String(item.stock) : "esgotado";
+        return `${item.code} (${item.costPoints} pts, estoque ${stock})`;
+      })
+      .join(" | ");
+    await sendMessage(
+      ctx.broadcasterId,
+      `🛒 Loja: ${line}. Use !resgatar <codigo> [qtd].`
+    );
+  };
+}
+
+export function createRedeemHandler(store: StoreService): CommandHandler {
+  return async (parsed, ctx) => {
+    const code = parsed.args[0] ?? "";
+    const quantity = Number.parseInt(parsed.args[1] ?? "1", 10);
+    const result = await store.redeemByCode(
+      ctx.channelSlug,
+      {
+        kickUserId: ctx.message.sender.id,
+        username: ctx.message.sender.username,
+        slug: ctx.message.sender.slug,
+      },
+      code,
+      quantity
+    );
+
+    if (!result.ok) {
+      await sendMessage(
+        ctx.broadcasterId,
+        `@${ctx.message.sender.username} ${result.error}`
+      );
+      return;
+    }
+
+    await sendMessage(
+      ctx.broadcasterId,
+      `@${ctx.message.sender.username} resgate confirmado: ${result.itemTitle} x${result.quantity} (${result.totalCost} pts). Saldo: ${result.remainingBalance}.`
+    );
+    logger.info(
+      `[STORE] Resgate ${ctx.message.sender.username}: ${result.itemTitle} x${result.quantity} (${result.totalCost})`
     );
   };
 }
