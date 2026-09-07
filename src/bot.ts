@@ -43,16 +43,21 @@ function relayWsMessageToDashboard(channelSlug: string, msg: ChatMessage): void 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
 
-  // Modo API-only: se não tiver KICK_CHANNEL_SLUG, roda apenas a API
+  // Modo API-only: se DISABLE_KICK_BOT=true ou faltarem variáveis do Kick
+  const disableBot = process.env.DISABLE_KICK_BOT === "true";
   const channelSlug = process.env.KICK_CHANNEL_SLUG;
   const botSlug = process.env.KICK_BOT_SLUG;
-  const apiOnlyMode = !channelSlug || !botSlug;
+  const apiOnlyMode = disableBot || !channelSlug || !botSlug;
 
   if (apiOnlyMode) {
     logger.info("=== MODO API-ONLY: Bot Kick desabilitado ===");
-    logger.info(`Missing: ${!channelSlug ? 'KICK_CHANNEL_SLUG ' : ''}${!botSlug ? 'KICK_BOT_SLUG' : ''}`);
+    if (disableBot) {
+      logger.info("Razão: DISABLE_KICK_BOT=true");
+    } else {
+      logger.info(`Razão: Missing ${!channelSlug ? 'KICK_CHANNEL_SLUG ' : ''}${!botSlug ? 'KICK_BOT_SLUG' : ''}`);
+    }
     logger.info("Apenas a API REST estará disponível");
-    logger.info("Configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG para habilitar o bot");
+    logger.info("Configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG e remova DISABLE_KICK_BOT para habilitar o bot");
   }
 
   try {
