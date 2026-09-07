@@ -145,7 +145,7 @@ export function createSetupRouter(): Router {
       }
 
       const adminRepo = await import("../../db/repositories/adminUserRepository.js");
-      const bcrypt = await import("bcryptjs");
+      const bcrypt = (await import("bcryptjs")).default;
       
       const admin = await adminRepo.findAdminUserByEmail(email);
       if (!admin) {
