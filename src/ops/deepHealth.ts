@@ -67,10 +67,15 @@ export async function collectDeepHealth(): Promise<DeepHealth> {
     detail: `depth=${runtimeHealth.getQueueDepth()}`,
   };
 
-  const parts = [database.status, redisHealth.status, websocket.status, queue.status];
-  const status: DeepHealth["status"] = parts.includes("down")
+  // Em modo API-only (sem KICK_CHANNEL_SLUG), WebSocket down é esperado e não afeta status geral
+  const apiOnlyMode = !process.env.KICK_CHANNEL_SLUG || !process.env.KICK_BOT_SLUG;
+  const criticalParts = apiOnlyMode 
+    ? [database.status, redisHealth.status, queue.status]
+    : [database.status, redisHealth.status, websocket.status, queue.status];
+  
+  const status: DeepHealth["status"] = criticalParts.includes("down")
     ? "down"
-    : parts.includes("degraded")
+    : criticalParts.includes("degraded")
       ? "degraded"
       : "ok";
 
