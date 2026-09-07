@@ -12,8 +12,7 @@ dist/
 data/
 *.db
 
-# Prisma
-prisma/migrations/
+# Prisma (não ignore migrations - elas precisam ir para produção)
 
 # Logs
 *.log

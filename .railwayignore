@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+.tokens.json
+*.log
+dist/
+data/
+.cursor/
+.git/
+*.test.ts
