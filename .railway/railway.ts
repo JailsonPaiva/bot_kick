@@ -7,6 +7,8 @@ export default {
   },
   deploy: {
     startCommand: "npx prisma migrate deploy && npm start",
+    healthcheckPath: "/api/health",
+    healthcheckTimeout: 300,
     restartPolicyType: "ON_FAILURE",
     restartPolicyMaxRetries: 10,
   },

@@ -54,6 +54,12 @@ export function startApiServer(services: GameServices): {
     createKickWebhooksRouter()
   );
 
+  // Logging de requisições para debug no Railway
+  app.use((req, _res, next) => {
+    logger.info(`[REQ] ${req.method} ${req.path}`, { ip: req.ip, headers: req.headers.host });
+    next();
+  });
+
   app.use(cors({ origin: CORS_ORIGIN }));
   app.use(express.json());
   app.use(requestContextMiddleware);
@@ -188,7 +194,8 @@ export function startApiServer(services: GameServices): {
   initChatEvents(io);
 
   server.listen(API_PORT, '0.0.0.0', () => {
-    logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);
+    logger.info(`[API] Servidor rodando em http://0.0.0.0:${API_PORT}`);
+    logger.info(`[API] PORT env: ${process.env.PORT}, API_PORT usado: ${API_PORT}`);
     logger.info("[API] WebSocket ativo na mesma porta");
   });
 
