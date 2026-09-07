@@ -32,7 +32,7 @@ Escolha:
 ### 3. Adicionar PostgreSQL
 
 ```bash
-railway add --plugin postgresql
+railway add --database postgres
 ```
 
 Isso provisionará automaticamente um banco PostgreSQL e injetará `DATABASE_URL` nas variáveis de ambiente.
@@ -40,7 +40,7 @@ Isso provisionará automaticamente um banco PostgreSQL e injetará `DATABASE_URL
 ### 4. Adicionar Redis
 
 ```bash
-railway add --plugin redis
+railway add --database redis
 ```
 
 Isso provisionará automaticamente Redis e injetará `REDIS_URL` nas variáveis de ambiente.

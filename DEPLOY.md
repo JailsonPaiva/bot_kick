@@ -28,8 +28,8 @@ railway init
 
 ### 3. Adicionar bancos
 ```bash
-railway add --plugin postgresql
-railway add --plugin redis
+railway add --database postgres
+railway add --database redis
 ```
 
 ### 4. Configurar variáveis

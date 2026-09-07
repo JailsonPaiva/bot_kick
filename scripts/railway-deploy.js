@@ -59,10 +59,10 @@ async function main() {
   exec(`railway init --name "${projectName}"`, 'Criando projeto Railway');
 
   // 3. Adicionar PostgreSQL
-  exec('railway add --plugin postgresql', 'Provisionando PostgreSQL');
+  exec('railway add --database postgres', 'Provisionando PostgreSQL');
 
   // 4. Adicionar Redis
-  exec('railway add --plugin redis', 'Provisionando Redis');
+  exec('railway add --database redis', 'Provisionando Redis');
 
   // 5. Configurar variáveis de ambiente
   console.log('\n🔐 === Configuração de Variáveis de Ambiente ===');
