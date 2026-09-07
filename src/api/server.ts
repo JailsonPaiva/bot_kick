@@ -31,7 +31,7 @@ import { initChatEvents } from "./chatEvents.js";
 import { setupSwagger } from "./swagger.js";
 import { requestContextMiddleware } from "./requestContext.js";
 
-const API_PORT = parseInt(process.env.API_PORT || "3001", 10);
+const API_PORT = parseInt(process.env.PORT || process.env.API_PORT || "3001", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
 export function startApiServer(services: GameServices): {
