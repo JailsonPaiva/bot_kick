@@ -32,7 +32,10 @@ import { setupSwagger } from "./swagger.js";
 import { requestContextMiddleware } from "./requestContext.js";
 
 const API_PORT = parseInt(process.env.PORT || process.env.API_PORT || "3001", 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
+
+// Suporta múltiplas origens separadas por vírgula
+const CORS_ORIGIN_ENV = process.env.CORS_ORIGIN || "http://localhost:3000";
+const CORS_ORIGINS = CORS_ORIGIN_ENV.split(",").map((origin) => origin.trim());
 
 export function startApiServer(services: GameServices): {
   server: http.Server;
@@ -42,7 +45,7 @@ export function startApiServer(services: GameServices): {
   const server = http.createServer(app);
   const io = new SocketIOServer(server, {
     cors: {
-      origin: CORS_ORIGIN,
+      origin: CORS_ORIGINS,
       methods: ["GET", "POST"],
     },
   });
@@ -60,7 +63,7 @@ export function startApiServer(services: GameServices): {
     next();
   });
 
-  app.use(cors({ origin: CORS_ORIGIN }));
+  app.use(cors({ origin: CORS_ORIGINS }));
   app.use(express.json());
   app.use(requestContextMiddleware);
 
@@ -196,6 +199,7 @@ export function startApiServer(services: GameServices): {
   server.listen(API_PORT, '0.0.0.0', () => {
     logger.info(`[API] Servidor rodando em http://0.0.0.0:${API_PORT}`);
     logger.info(`[API] PORT env: ${process.env.PORT}, API_PORT usado: ${API_PORT}`);
+    logger.info(`[API] CORS origens permitidas: ${CORS_ORIGINS.join(", ")}`);
     logger.info("[API] WebSocket ativo na mesma porta");
   });
 
