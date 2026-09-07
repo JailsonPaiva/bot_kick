@@ -49,8 +49,10 @@ async function main(): Promise<void> {
   const apiOnlyMode = !channelSlug || !botSlug;
 
   if (apiOnlyMode) {
-    logger.info("=== MODO API-ONLY: Bot Kick desabilitado (faltam KICK_CHANNEL_SLUG ou KICK_BOT_SLUG) ===");
+    logger.info("=== MODO API-ONLY: Bot Kick desabilitado ===");
+    logger.info(`Missing: ${!channelSlug ? 'KICK_CHANNEL_SLUG ' : ''}${!botSlug ? 'KICK_BOT_SLUG' : ''}`);
     logger.info("Apenas a API REST estará disponível");
+    logger.info("Configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG para habilitar o bot");
   }
 
   try {
@@ -62,17 +64,6 @@ async function main(): Promise<void> {
     }, err);
   }
 
-  // Se não estiver em modo API-only, tentar autenticação
-  if (!apiOnlyMode && channelSlug && botSlug) {
-    try {
-      await ensureAuthenticated();
-      logger.info("Autenticação OK");
-    } catch (error) {
-      logger.error("Falha na autenticação OAuth - continuando em modo API-only", error);
-      // Continuar sem OAuth - apenas API funcionará
-    }
-  }
-
   const services = createGameServices();
   
   // Iniciar API Server primeiro (sempre disponível)
@@ -80,12 +71,24 @@ async function main(): Promise<void> {
   
   // Se em modo API-only, apenas iniciar API e retornar
   if (apiOnlyMode) {
-    logger.info("API Server iniciado em modo API-only");
-    logger.info(`Dashboard disponível - configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG para habilitar o bot`);
+    logger.info("✅ API Server rodando em http://localhost:" + (process.env.API_PORT || "3001"));
+    logger.info("📊 Dashboard disponível");
+    logger.info("🔧 Para habilitar o bot Kick, configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG");
     return; // Não inicializar bot/websocket/chat
   }
 
   // Modo completo: iniciar bot + API
+  logger.info("Modo completo: iniciando bot Kick...");
+  
+  try {
+    await ensureAuthenticated();
+    logger.info("Autenticação OK");
+  } catch (error) {
+    logger.error("Falha na autenticação OAuth - API continuará funcionando", error);
+    logger.info("✅ API Server rodando em http://localhost:" + (process.env.API_PORT || "3001"));
+    return; // Não inicializar bot se OAuth falhar
+  }
+
   const [chatroomId, broadcasterId] = await Promise.all([
     resolveChatroomId(channelSlug!),
     getAuthenticatedBroadcasterId(),
