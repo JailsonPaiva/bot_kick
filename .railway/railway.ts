@@ -3,10 +3,10 @@ import type { Config } from "@railway/cli";
 export default {
   build: {
     builder: "NIXPACKS",
-    buildCommand: "npm install && npm run prisma:generate && npm run build",
+    buildCommand: "npm ci && npx prisma generate && npm run build",
   },
   deploy: {
-    startCommand: "npm run prisma:migrate:deploy && npm start",
+    startCommand: "npx prisma migrate deploy && npm start",
     restartPolicyType: "ON_FAILURE",
     restartPolicyMaxRetries: 10,
   },

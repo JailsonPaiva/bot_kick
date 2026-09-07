@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Modelos de canal e sessão (Fase 1 — multi-channel futuro) ───────────────
