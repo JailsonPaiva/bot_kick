@@ -187,7 +187,7 @@ export function startApiServer(services: GameServices): {
   initAlertEvents(io);
   initChatEvents(io);
 
-  server.listen(API_PORT, () => {
+  server.listen(API_PORT, '0.0.0.0', () => {
     logger.info(`[API] Servidor rodando em http://localhost:${API_PORT}`);
     logger.info("[API] WebSocket ativo na mesma porta");
   });
