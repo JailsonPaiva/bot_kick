@@ -114,5 +114,61 @@ export function createSetupRouter(): Router {
     }
   });
 
+  // DEBUG: Endpoint temporário para listar admins (remover em produção)
+  router.get("/debug/admins", async (_req, res) => {
+    try {
+      const adminRepo = await import("../../db/repositories/adminUserRepository.js");
+      const admins = await adminRepo.listAdminUsers();
+      res.json({ 
+        success: true, 
+        count: admins.length,
+        admins: admins.map((a: any) => ({
+          id: a.id,
+          email: a.email,
+          username: a.username,
+          role: a.role,
+          isActive: a.isActive,
+          createdAt: a.createdAt
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
+
+  // DEBUG: Endpoint temporário para resetar senha (remover em produção)
+  router.post("/debug/reset-password", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: "Email e password são obrigatórios" });
+      }
+
+      const adminRepo = await import("../../db/repositories/adminUserRepository.js");
+      const bcrypt = await import("bcryptjs");
+      
+      const admin = await adminRepo.findAdminUserByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ success: false, error: "Admin não encontrado" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const { prisma } = await import("../../infra/prisma/client.js");
+      await prisma.adminUser.update({
+        where: { email },
+        data: { passwordHash },
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Senha resetada com sucesso",
+        email,
+        username: admin.username
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
+
   return router;
 }
