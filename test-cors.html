@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste CORS - Bot Kick</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .endpoint {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste CORS - Bot Kick API</h1>
+        
+        <div class="endpoint">
+            <strong>API Base URL:</strong><br>
+            <input type="text" id="apiUrl" value="https://botkick-production.up.railway.app" style="width: 100%; padding: 8px; margin-top: 5px;">
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="testHealth()">📊 Testar /api/health</button>
+            <button onclick="testStatus()">📈 Testar /api/status</button>
+            <button onclick="testRoot()">🏠 Testar /</button>
+            <button onclick="testWebSocket()">🔌 Testar WebSocket</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value;
+        }
+
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+        }
+
+        async function testHealth() {
+            showResult('info', '⏳ Testando endpoint /api/health...');
+            
+            try {
+                const response = await fetch(`${getApiUrl()}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', 
+                        `✅ Sucesso! Status: ${response.status}\n\n` +
+                        `Resposta:\n${JSON.stringify(data, null, 2)}\n\n` +
+                        `CORS funcionando corretamente!`
+                    );
+                } else {
+                    showResult('error', 
+                        `⚠️ Resposta não-OK: ${response.status}\n\n` +
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                showResult('error', 
+                    `❌ Erro ao conectar:\n\n${error.message}\n\n` +
+                    `Possíveis causas:\n` +
+                    `1. CORS não está configurado corretamente\n` +
+                    `2. API está offline\n` +
+                    `3. URL incorreta`
+                );
+            }
+        }
+
+        async function testStatus() {
+            showResult('info', '⏳ Testando endpoint /api/status...');
+            
+            try {
+                const response = await fetch(`${getApiUrl()}/api/status`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', 
+                        `✅ Sucesso! Status: ${response.status}\n\n` +
+                        `Resposta:\n${JSON.stringify(data, null, 2)}`
+                    );
+                } else {
+                    showResult('error', 
+                        `⚠️ Resposta não-OK: ${response.status}\n\n` +
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                showResult('error', `❌ Erro: ${error.message}`);
+            }
+        }
+
+        async function testRoot() {
+            showResult('info', '⏳ Testando endpoint raiz /...');
+            
+            try {
+                const response = await fetch(`${getApiUrl()}/`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', 
+                        `✅ Sucesso! Status: ${response.status}\n\n` +
+                        `API: ${data.name}\n` +
+                        `Versão: ${data.version}\n\n` +
+                        `Endpoints disponíveis:\n${Object.keys(data.endpoints).join(', ')}`
+                    );
+                } else {
+                    showResult('error', 
+                        `⚠️ Resposta não-OK: ${response.status}\n\n` +
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                showResult('error', `❌ Erro: ${error.message}`);
+            }
+        }
+
+        async function testWebSocket() {
+            showResult('info', '⏳ Testando conexão WebSocket...');
+            
+            try {
+                const apiUrl = getApiUrl();
+                const wsUrl = apiUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+                const ws = new WebSocket(wsUrl);
+
+                let timeout = setTimeout(() => {
+                    ws.close();
+                    showResult('error', '❌ Timeout: WebSocket não conectou em 5 segundos');
+                }, 5000);
+
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    showResult('success', 
+                        `✅ WebSocket conectado com sucesso!\n\n` +
+                        `URL: ${wsUrl}\n` +
+                        `Estado: ${ws.readyState === 1 ? 'OPEN' : 'CONNECTING'}`
+                    );
+                    
+                    // Fechar conexão após 1 segundo
+                    setTimeout(() => {
+                        ws.close();
+                    }, 1000);
+                };
+
+                ws.onerror = (error) => {
+                    clearTimeout(timeout);
+                    showResult('error', 
+                        `❌ Erro no WebSocket\n\n` +
+                        `Possíveis causas:\n` +
+                        `1. CORS não permite WebSocket\n` +
+                        `2. Servidor WebSocket offline\n` +
+                        `3. URL incorreta`
+                    );
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket fechado');
+                };
+
+            } catch (error) {
+                showResult('error', `❌ Erro: ${error.message}`);
+            }
+        }
+
+        // Executar teste inicial ao carregar
+        window.onload = () => {
+            showResult('info', 
+                '📋 Pronto para testar!\n\n' +
+                'Clique nos botões acima para testar diferentes endpoints.\n\n' +
+                'Este arquivo testa se o CORS está configurado corretamente para permitir\n' +
+                'requisições do frontend Vercel para a API Railway.'
+            );
+        };
+    </script>
+</body>
+</html>
