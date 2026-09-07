@@ -95,7 +95,7 @@ export function createAuthRouter(): Router {
   });
 
   // Listar usuários admin (requer autenticação)
-  router.get("/users", authMiddleware, async (req, res) => {
+  router.get("/users", authMiddleware, async (_req, res) => {
     try {
       const users = await listAdminUsers();
       const sanitized = users.map((u) => ({
@@ -148,7 +148,7 @@ export function createAuthRouter(): Router {
 
   // Atualizar usuário admin (requer autenticação)
   router.put("/users/:id", authMiddleware, async (req, res) => {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { email, username, password, role, isActive } = req.body;
 
     try {
@@ -173,7 +173,7 @@ export function createAuthRouter(): Router {
 
   // Deletar usuário admin (requer autenticação)
   router.delete("/users/:id", authMiddleware, async (req, res) => {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     try {
       // Impedir deletar se for o último admin ativo

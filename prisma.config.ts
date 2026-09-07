@@ -1,8 +1,8 @@
-import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
-// Fallback para build time - usa variável de ambiente ou valor dummy
-const databaseUrl = process.env.DATABASE_URL || "postgresql://user:pass@localhost:5432/db";
+// Não carrega .env durante build - apenas em runtime
+// Durante build, usa valor dummy passado via CLI
+const databaseUrl = process.env.DATABASE_URL || "postgresql://dummy:dummy@localhost:5432/dummy";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

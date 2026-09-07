@@ -63,7 +63,7 @@ export function isLoginRateLimited(ip: string): boolean {
 /**
  * @deprecated Use adminUserRepository.verifyAdminPassword instead
  */
-export async function verifyPassword(password: string): Promise<boolean> {
+export async function verifyPassword(_password: string): Promise<boolean> {
   logger.warn("verifyPassword is deprecated - use adminUserRepository instead");
   return false;
 }
