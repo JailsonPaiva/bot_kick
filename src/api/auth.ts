@@ -28,14 +28,9 @@ function resolveJwtSecret(): string {
 }
 
 const JWT_SECRET = resolveJwtSecret();
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || "";
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 20;
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-
-if (!ADMIN_PASSWORD_HASH && process.env.NODE_ENV === "production") {
-  throw new Error("ADMIN_PASSWORD_HASH obrigatório em produção");
-}
 
 export interface JWTPayload {
   userId: string;
@@ -65,15 +60,12 @@ export function isLoginRateLimited(ip: string): boolean {
   return row.count > LOGIN_MAX_ATTEMPTS;
 }
 
+/**
+ * @deprecated Use adminUserRepository.verifyAdminPassword instead
+ */
 export async function verifyPassword(password: string): Promise<boolean> {
-  if (!ADMIN_PASSWORD_HASH) {
-    if (process.env.NODE_ENV === "production") {
-      return false;
-    }
-    return password === "admin";
-  }
-
-  return bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+  logger.warn("verifyPassword is deprecated - use adminUserRepository instead");
+  return false;
 }
 
 export async function hashPassword(password: string): Promise<string> {
