@@ -41,6 +41,14 @@ function relayWsMessageToDashboard(channelSlug: string, msg: ChatMessage): void 
 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
+  
+  // Debug: mostrar variáveis de ambiente relacionadas a porta
+  logger.info(`[DEBUG] PORT env variables:`, {
+    PORT: process.env.PORT,
+    API_PORT: process.env.API_PORT,
+    NODE_ENV: process.env.NODE_ENV,
+    RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT,
+  });
 
   // Modo API-only: se DISABLE_KICK_BOT=true ou faltarem variáveis do Kick
   const disableBot = process.env.DISABLE_KICK_BOT === "true";
