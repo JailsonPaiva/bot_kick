@@ -14,7 +14,11 @@ A partir desta versão, **não usamos mais** variáveis de ambiente (`.env`) par
 - ✅ **Gerenciamento**: CRUD completo via API
 - ✅ **Roles**: Suporte futuro para diferentes níveis de permissão
 
+
+
 ## 🚀 Primeiro Acesso (Criar Admin Inicial)
+
+
 
 ### No Railway (Produção)
 
@@ -26,10 +30,13 @@ railway run npm run seed:admin
 ```
 
 O script vai perguntar:
+
 - Email
 - Username
 - Senha
 - Confirmação de senha
+
+
 
 ### Local (Desenvolvimento)
 
@@ -37,6 +44,8 @@ O script vai perguntar:
 # Com banco local rodando
 npm run seed:admin
 ```
+
+
 
 ## 📊 Modelo AdminUser
 
@@ -54,7 +63,11 @@ model AdminUser {
 }
 ```
 
+
+
 ## 🔑 API de Autenticação
+
+
 
 ### POST /api/auth/login
 
@@ -70,6 +83,7 @@ curl -X POST http://localhost:3001/api/auth/login \
 ```
 
 **Resposta de sucesso:**
+
 ```json
 {
   "success": true,
@@ -86,6 +100,8 @@ curl -X POST http://localhost:3001/api/auth/login \
 }
 ```
 
+
+
 ### GET /api/auth/users
 
 Listar todos os usuários (requer autenticação):
@@ -94,6 +110,8 @@ Listar todos os usuários (requer autenticação):
 curl http://localhost:3001/api/auth/users \
   -H "Authorization: Bearer SEU_TOKEN"
 ```
+
+
 
 ### POST /api/auth/users
 
@@ -111,6 +129,8 @@ curl -X POST http://localhost:3001/api/auth/users \
   }'
 ```
 
+
+
 ### PUT /api/auth/users/:id
 
 Atualizar usuário (requer autenticação):
@@ -125,6 +145,8 @@ curl -X PUT http://localhost:3001/api/auth/users/UUID \
   }'
 ```
 
+
+
 ### DELETE /api/auth/users/:id
 
 Deletar usuário (requer autenticação):
@@ -138,11 +160,15 @@ curl -X DELETE http://localhost:3001/api/auth/users/UUID \
 
 ## 🔒 Segurança
 
+
+
 ### Hashing de Senhas
 
 - Algoritmo: **bcrypt**
 - Rounds: **10** (2^10 = 1024 iterações)
 - Salt: Gerado automaticamente por bcrypt
+
+
 
 ### Rate Limiting
 
@@ -150,13 +176,19 @@ curl -X DELETE http://localhost:3001/api/auth/users/UUID \
 - Máximo: **20 tentativas** por IP
 - Reset automático após janela
 
+
+
 ### JWT
 
 - Algoritmo: **HS256**
 - Expiração: **24 horas**
 - Secret: `API_JWT_SECRET` (variável de ambiente)
 
+
+
 ## 🛠️ Manutenção
+
+
 
 ### Resetar Senha de Usuário
 
@@ -179,11 +211,15 @@ SET "passwordHash" = 'HASH_GERADO_ACIMA'
 WHERE email = 'admin@example.com';
 ```
 
+
+
 ### Desativar Usuário
 
 ```sql
 UPDATE "AdminUser" SET "isActive" = false WHERE email = 'usuario@example.com';
 ```
+
+
 
 ### Reativar Usuário
 
@@ -191,20 +227,26 @@ UPDATE "AdminUser" SET "isActive" = false WHERE email = 'usuario@example.com';
 UPDATE "AdminUser" SET "isActive" = true WHERE email = 'usuario@example.com';
 ```
 
+
+
 ## ⚠️ Migração de .env
 
 Se você tinha `ADMIN_PASSWORD_HASH` no `.env`, **remova essa variável** após criar o primeiro admin no banco.
 
 **Antes (.env):**
+
 ```bash
 ADMIN_PASSWORD_HASH=$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Depois:**
+
 ```bash
 # ADMIN_PASSWORD_HASH removido - usuários agora no banco de dados
 API_JWT_SECRET=seu-jwt-secret-aqui
 ```
+
+
 
 ## 📝 Checklist de Deploy
 
@@ -214,7 +256,11 @@ API_JWT_SECRET=seu-jwt-secret-aqui
 - [ ] Remover `ADMIN_PASSWORD_HASH` do Railway Variables (se existir)
 - [ ] Documentar credenciais do admin inicial em local seguro
 
+
+
 ## 🔍 Troubleshooting
+
+
 
 ### Erro: "Credenciais inválidas"
 
@@ -222,18 +268,25 @@ API_JWT_SECRET=seu-jwt-secret-aqui
 - Confirme que `isActive = true`
 - Verifique se a senha está correta
 
+
+
 ### Erro: "Token inválido ou expirado"
 
 - Token JWT expira em 24h
 - Faça login novamente para obter novo token
+
+
 
 ### Erro: "Não é possível deletar o último administrador"
 
 - Sempre deve existir pelo menos 1 admin ativo
 - Crie outro admin antes de deletar o atual
 
+
+
 ## 📚 Referências
 
 - [bcrypt](https://www.npmjs.com/package/bcryptjs)
 - [jsonwebtoken](https://www.npmjs.com/package/jsonwebtoken)
 - [Prisma Client](https://www.prisma.io/docs/concepts/components/prisma-client)
+

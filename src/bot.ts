@@ -15,7 +15,6 @@ import { loyaltyService } from "./loyalty/loyaltyService.js";
 import { giveawayService } from "./engagement/giveawayService.js";
 import { startApiServer } from "./api/index.js";
 import { broadcastChatMessage } from "./api/chatEvents.js";
-import { requireEnv } from "./utils/env.js";
 import { logger } from "./utils/logger.js";
 import { connectRedis } from "./infra/redis/redisClient.js";
 import { isModuleEnabled } from "./ops/featureFlags.js";
