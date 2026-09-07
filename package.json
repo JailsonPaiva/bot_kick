@@ -19,7 +19,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "keywords": [
     "kick",
