@@ -24,6 +24,7 @@ import { createPublicRouter } from "./routes/public.js";
 import { createKickWebhooksRouter } from "./routes/kickWebhooks.js";
 import { createChatRouter } from "./routes/chat.js";
 import { createOpsRouter } from "./routes/ops.js";
+import { createSetupRouter } from "./routes/setup.js";
 import { initGameEvents } from "./gameEvents.js";
 import { initAlertEvents } from "./alertEvents.js";
 import { initChatEvents } from "./chatEvents.js";
@@ -56,6 +57,9 @@ export function startApiServer(services: GameServices): {
   app.use(cors({ origin: CORS_ORIGIN }));
   app.use(express.json());
   app.use(requestContextMiddleware);
+
+  // Setup inicial (criar primeiro admin)
+  app.use("/api/setup", createSetupRouter());
 
   // Autenticação do dashboard
   app.use("/api/auth", createAuthRouter());

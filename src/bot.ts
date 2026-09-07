@@ -43,8 +43,15 @@ function relayWsMessageToDashboard(channelSlug: string, msg: ChatMessage): void 
 async function main(): Promise<void> {
   logger.info("=== Kick Bot v4 — PostgreSQL + Redis ===");
 
-  const channelSlug = requireEnv("KICK_CHANNEL_SLUG");
-  const botSlug = requireEnv("KICK_BOT_SLUG");
+  // Modo API-only: se não tiver KICK_CHANNEL_SLUG, roda apenas a API
+  const channelSlug = process.env.KICK_CHANNEL_SLUG;
+  const botSlug = process.env.KICK_BOT_SLUG;
+  const apiOnlyMode = !channelSlug || !botSlug;
+
+  if (apiOnlyMode) {
+    logger.info("=== MODO API-ONLY: Bot Kick desabilitado (faltam KICK_CHANNEL_SLUG ou KICK_BOT_SLUG) ===");
+    logger.info("Apenas a API REST estará disponível");
+  }
 
   try {
     await connectRedis();
@@ -55,21 +62,39 @@ async function main(): Promise<void> {
     }, err);
   }
 
-  await ensureAuthenticated();
-  logger.info("Autenticação OK");
+  // Se não estiver em modo API-only, tentar autenticação
+  if (!apiOnlyMode && channelSlug && botSlug) {
+    try {
+      await ensureAuthenticated();
+      logger.info("Autenticação OK");
+    } catch (error) {
+      logger.error("Falha na autenticação OAuth - continuando em modo API-only", error);
+      // Continuar sem OAuth - apenas API funcionará
+    }
+  }
 
+  const services = createGameServices();
+  
+  // Iniciar API Server primeiro (sempre disponível)
+  const { server: apiServer, io } = startApiServer(services);
+  
+  // Se em modo API-only, apenas iniciar API e retornar
+  if (apiOnlyMode) {
+    logger.info("API Server iniciado em modo API-only");
+    logger.info(`Dashboard disponível - configure KICK_CHANNEL_SLUG e KICK_BOT_SLUG para habilitar o bot`);
+    return; // Não inicializar bot/websocket/chat
+  }
+
+  // Modo completo: iniciar bot + API
   const [chatroomId, broadcasterId] = await Promise.all([
-    resolveChatroomId(channelSlug),
+    resolveChatroomId(channelSlug!),
     getAuthenticatedBroadcasterId(),
   ]);
 
-  const services = createGameServices();
   await setupGameServices(services, broadcasterId);
 
   // Fase 2 — iniciar timers
-  await timerService.start(broadcasterId, channelSlug);
-
-  const { server: apiServer, io } = startApiServer(services);
+  await timerService.start(broadcasterId, channelSlug!);
 
   const router = createCommandRouter(
     services.registry,
@@ -82,24 +107,24 @@ async function main(): Promise<void> {
   listener.on("message", (msg: ChatMessage) => {
     void (async () => {
       // Fallback de chat ao vivo: se webhook não chegar, o dashboard ainda recebe via WS do bot
-      if (isModuleEnabled(channelSlug, "chat")) {
-        relayWsMessageToDashboard(channelSlug, msg);
+      if (isModuleEnabled(channelSlug!, "chat")) {
+        relayWsMessageToDashboard(channelSlug!, msg);
       }
 
-      if (isModuleEnabled(channelSlug, "loyalty")) {
-        await loyaltyService.trackChatActivity(channelSlug, msg);
+      if (isModuleEnabled(channelSlug!, "loyalty")) {
+        await loyaltyService.trackChatActivity(channelSlug!, msg);
       }
 
-      if (isModuleEnabled(channelSlug, "moderation")) {
-        const modResult = await checkModeration(msg, channelSlug, broadcasterId);
+      if (isModuleEnabled(channelSlug!, "moderation")) {
+        const modResult = await checkModeration(msg, channelSlug!, broadcasterId);
         if (modResult.blocked) return;
       }
 
       if (
-        isModuleEnabled(channelSlug, "giveaways") &&
-        msg.sender.slug.toLowerCase() !== botSlug.toLowerCase()
+        isModuleEnabled(channelSlug!, "giveaways") &&
+        msg.sender.slug.toLowerCase() !== botSlug!.toLowerCase()
       ) {
-        await giveawayService.tryEnterFromChat(channelSlug, {
+        await giveawayService.tryEnterFromChat(channelSlug!, {
           kickUserId: msg.sender.id,
           username: msg.sender.username,
           slug: msg.sender.slug,
@@ -107,13 +132,13 @@ async function main(): Promise<void> {
         });
       }
 
-      if (isModuleEnabled(channelSlug, "commands")) {
+      if (isModuleEnabled(channelSlug!, "commands")) {
         metrics.recordCommand();
         await router.dispatch(msg, {
           message: msg,
           broadcasterId,
-          botSlug,
-          channelSlug,
+          botSlug: botSlug!,
+          channelSlug: channelSlug!,
           chatroomId,
         });
       }
